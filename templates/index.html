@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="hero-section text-center py-5 mb-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <i class="fas fa-user-check fa-4x text-primary mb-4"></i>
+        <h1 class="display-4 fw-bold mb-4">Automated Face Recognition Attendance</h1>
+        <p class="lead text-muted mb-5">Streamline your attendance tracking with advanced face recognition technology</p>
+        
+        <div class="row g-3 justify-content-center">
+          <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0 feature-card">
+              <div class="card-body">
+                <i class="fas fa-user-plus fa-2x text-primary mb-3"></i>
+                <h5 class="card-title">Register Students</h5>
+                <p class="card-text">Add new students to the system with their face data</p>
+                <a href="/register" class="btn btn-primary">Register Now</a>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0 feature-card">
+              <div class="card-body">
+                <i class="fas fa-qrcode fa-2x text-success mb-3"></i>
+                <h5 class="card-title">Take Attendance</h5>
+                <p class="card-text">Mark attendance using face recognition technology</p>
+                <a href="/attendance" class="btn btn-success">Take Attendance</a>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0 feature-card">
+              <div class="card-body">
+                <i class="fas fa-tachometer-alt fa-2x text-info mb-3"></i>
+                <h5 class="card-title">View Dashboard</h5>
+                <p class="card-text">Monitor attendance records and statistics</p>
+                <a href="/dashboard" class="btn btn-info">Dashboard</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-md-8 mx-auto text-center">
+      <h2 class="mb-4">How It Works</h2>
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="process-step">
+            <div class="step-number d-flex align-items-center justify-content-center mx-auto mb-3">
+              <span>1</span>
+            </div>
+            <h5>Register</h5>
+            <p class="text-muted">Add student details and capture face images</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="process-step">
+            <div class="step-number d-flex align-items-center justify-content-center mx-auto mb-3">
+              <span>2</span>
+            </div>
+            <h5>Train</h5>
+            <p class="text-muted">System learns to recognize faces</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="process-step">
+            <div class="step-number d-flex align-items-center justify-content-center mx-auto mb-3">
+              <span>3</span>
+            </div>
+            <h5>Mark Attendance</h5>
+            <p class="text-muted">Automatic attendance marking</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

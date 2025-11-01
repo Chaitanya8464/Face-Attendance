@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card shadow border-0 text-center">
+      <div class="card-header bg-success text-white py-4">
+        <h3 class="mb-0"><i class="fas fa-check-circle me-2"></i>Training Complete</h3>
+      </div>
+      <div class="card-body p-5">
+        <div class="mb-4">
+          <i class="fas fa-sync-alt fa-4x text-success mb-3"></i>
+          <h4 class="fw-bold">Face Recognition Model Trained</h4>
+        </div>
+        
+        <div class="bg-light rounded p-4 mb-4">
+          <p class="mb-1">Total Encodings Processed</p>
+          <h2 class="text-success fw-bold mb-0">{{ total }}</h2>
+        </div>
+        
+        <p class="text-muted">
+          The system has successfully trained on the captured face images. 
+          Students can now be recognized for attendance.
+        </p>
+        
+        <div class="d-grid gap-2">
+          <a href="/dashboard" class="btn btn-primary btn-lg">
+            <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+          </a>
+          <a href="/attendance" class="btn btn-success">
+            <i class="fas fa-qrcode me-2"></i>Take Attendance Now
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

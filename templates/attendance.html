@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12">
+    <div class="card shadow border-0">
+      <div class="card-header bg-success text-white text-center py-4">
+        <h3 class="mb-0"><i class="fas fa-qrcode me-2"></i>Take Attendance</h3>
+      </div>
+      <div class="card-body p-4 text-center">
+        <div class="mb-4">
+          <i class="fas fa-camera fa-3x text-success mb-3"></i>
+          <h4 class="fw-bold">Face Recognition Attendance</h4>
+          <p class="text-muted">
+            Position yourself in front of the camera and click the button to capture your face for attendance marking.
+          </p>
+        </div>
+        
+        <div class="row">
+          <div class="col-lg-8 mx-auto">
+            <div class="position-relative mb-4">
+              <video id="attendanceVideo" autoplay playsinline class="w-100 rounded shadow" style="max-height: 400px;"></video>
+              <div class="camera-overlay position-absolute top-0 start-0 w-100 h-100 rounded" style="border: 3px dashed rgba(255,255,255,0.5);"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="d-grid gap-3 mb-4">
+          <button id="startAttendance" class="btn btn-success btn-lg">
+            <i class="fas fa-eye me-2"></i>Start Recognition
+          </button>
+          <button id="stopAttendance" class="btn btn-danger btn-lg d-none">
+            <i class="fas fa-stop me-2"></i>Stop Recognition
+          </button>
+        </div>
+        
+        <div id="attendanceResult" class="mt-4">
+          <div class="alert alert-info d-none" role="alert">
+            <i class="fas fa-spinner fa-spin me-2"></i>Processing...
+          </div>
+          <div class="alert alert-success d-none" role="alert">
+            <i class="fas fa-check-circle me-2"></i>Attendance marked successfully!
+          </div>
+          <div class="alert alert-warning d-none" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>No students recognized
+          </div>
+          <div class="alert alert-danger d-none" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>Error occurred
+          </div>
+        </div>
+        
+        <div id="detectedStudents" class="mt-4">
+          <h5>Detected Students</h5>
+          <div class="list-group" id="studentList">
+            <!-- Detected students will appear here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let video = document.getElementById('attendanceVideo');
+  let stream = null;
+  let recognitionInterval = null;
+  
+  // Initialize camera for attendance
+  async function initAttendanceCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({video: true});
+      video.srcObject = stream;
+      showNotification('Camera connected successfully!', 'success');
+    } catch (err) {
+      console.error('Camera init failed', err);
+      showNotification('Could not access camera. Please allow camera permission or try a different browser.', 'error');
+    }
+  }
+  
+  // Start face recognition
+  document.getElementById('startAttendance').onclick = async () => {
+    // Show stop button and hide start button
+    document.getElementById('startAttendance').classList.add('d-none');
+    document.getElementById('stopAttendance').classList.remove('d-none');
+    
+    // Start recognition every 2 seconds
+    recognitionInterval = setInterval(async () => {
+      const processingAlert = document.querySelector('.alert-info');
+      const successAlert = document.querySelector('.alert-success');
+      const warningAlert = document.querySelector('.alert-warning');
+      const dangerAlert = document.querySelector('.alert-danger');
+      const resultDiv = document.getElementById('attendanceResult');
+      const studentList = document.getElementById('studentList');
+      
+      // Reset alerts
+      processingAlert.classList.add('d-none');
+      successAlert.classList.add('d-none');
+      warningAlert.classList.add('d-none');
+      dangerAlert.classList.add('d-none');
+      
+      // Show processing
+      processingAlert.classList.remove('d-none');
+      
+      try {
+        // Capture frame from video
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        
+        // Send to server for recognition
+        const res = await fetch('/api/recognize_attendance', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({image: dataUrl})
+        });
+        
+        const data = await res.json();
+        
+        processingAlert.classList.add('d-none');
+        
+        if(data.error) {
+          dangerAlert.classList.remove('d-none');
+          dangerAlert.querySelector('.fa-exclamation-circle').nextSibling.textContent = ` ${data.error}`;
+          return;
+        }
+        
+        if(!data.recognized || data.recognized.length === 0) {
+          // No students recognized, but not an error
+          if (!warningAlert.classList.contains('d-none')) {
+            warningAlert.classList.remove('d-none');
+          }
+          return;
+        }
+        
+        // Hide warning if students were recognized
+        warningAlert.classList.add('d-none');
+        successAlert.classList.remove('d-none');
+        
+        // Update student list
+        studentList.innerHTML = '';
+        data.recognized.forEach(m => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item d-flex justify-content-between align-items-center';
+          li.innerHTML = `${m.roll} - ${m.name}<span class="badge bg-success">Present</span>`;
+          studentList.appendChild(li);
+        });
+        
+      } catch (error) {
+        processingAlert.classList.add('d-none');
+        dangerAlert.classList.remove('d-none');
+        dangerAlert.querySelector('.fa-exclamation-circle').nextSibling.textContent = ` Network error occurred`;
+      }
+    }, 2000); // Repeat every 2 seconds
+  };
+  
+  // Stop face recognition
+  document.getElementById('stopAttendance').onclick = () => {
+    if (recognitionInterval) {
+      clearInterval(recognitionInterval);
+      recognitionInterval = null;
+    }
+    
+    // Show start button and hide stop button
+    document.getElementById('stopAttendance').classList.add('d-none');
+    document.getElementById('startAttendance').classList.remove('d-none');
+    
+    // Hide alerts
+    document.querySelectorAll('.alert').forEach(alert => alert.classList.add('d-none'));
+  };
+  
+  // Initialize camera when page loads
+  document.addEventListener('DOMContentLoaded', initAttendanceCamera);
+  
+  // Helper function to show notifications
+  function showNotification(message, type = 'info') {
+    // Remove existing notification if any
+    const existingAlert = document.querySelector('.notification-toast');
+    if (existingAlert) existingAlert.remove();
+    
+    const alertTypes = {
+      success: 'bg-success',
+      error: 'bg-danger',
+      info: 'bg-info',
+      warning: 'bg-warning'
+    };
+    
+    const alertClass = alertTypes[type] || 'bg-info';
+    
+    // Create toast notification
+    const toastHTML = `
+      <div class="position-fixed bottom-0 end-0 p-3 notification-toast" style="z-index: 11">
+        <div class="toast ${alertClass} text-white" role="alert">
+          <div class="toast-body">
+            <i class="fas me-2"></i>
+            ${message}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', toastHTML);
+    
+    const toastEl = document.querySelector('.notification-toast .toast');
+    const icon = toastEl.querySelector('.fas');
+    
+    // Set icon based on type
+    icon.className = `fas me-2 ${
+      type === 'success' ? 'fa-check-circle' : 
+      type === 'error' ? 'fa-exclamation-circle' : 
+      type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'
+    }`;
+    
+    // Show toast
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    toast.show();
+    
+    // Remove after animation
+    setTimeout(() => {
+      if (document.querySelector('.notification-toast')) {
+        document.querySelector('.notification-toast').remove();
+      }
+    }, 3500);
+  }
+</script>
+{% endblock %}

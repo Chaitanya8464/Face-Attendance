@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card shadow border-0">
+      <div class="card-header bg-primary text-white text-center py-4">
+        <h3 class="mb-0"><i class="fas fa-user-plus me-2"></i>Register Student</h3>
+      </div>
+      <div class="card-body p-5">
+        {% if error %}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+        
+        <form method="POST" class="mb-3">
+          <div class="mb-4">
+            <label class="form-label fw-bold">Student Name</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fas fa-user"></i></span>
+              <input class="form-control form-control-lg" name="name" placeholder="Enter full name" required>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <label class="form-label fw-bold">Roll Number</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+              <input class="form-control form-control-lg" name="roll" placeholder="Enter roll number" required>
+            </div>
+          </div>
+          
+          <div class="d-grid">
+            <button class="btn btn-primary btn-lg" type="submit">
+              <i class="fas fa-save me-2"></i>Register & Capture Photos
+            </button>
+          </div>
+        </form>
+        
+        <div class="text-center mt-4">
+          <p class="mb-0 text-muted">
+            <i class="fas fa-info-circle me-1"></i>
+            After registration you will be redirected to capture page to take face photos
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
