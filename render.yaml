@@ -1,13 +1,12 @@
 services:
   - type: web
     name: attendance-face-recog
-    env: python
+    env: docker
     region: oregon
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    dockerfilePath: ./Dockerfile
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
       - key: FLASK_ENV
         value: production
+      - key: PYTHONUNBUFFERED
+        value: 1
