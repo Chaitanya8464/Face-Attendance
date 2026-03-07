@@ -1,9 +1,11 @@
 import os
 import base64
+import io
+import csv
 import numpy as np
 import cv2
-from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from datetime import datetime, timedelta
+from flask import Flask, render_template, request, redirect, url_for, jsonify, make_response, Response
 from models import db, Student, Attendance
 from face_utils import encode_faces, recognize_faces_from_frame, save_base64_image
 
@@ -211,7 +213,113 @@ def api_recognize_attendance():
 def dashboard():
     students = Student.query.order_by(Student.id).all()
     attendance = Attendance.query.order_by(Attendance.timestamp.desc()).limit(100).all()
-    return render_template('dashboard.html', students=students, attendance=attendance)
+    from datetime import datetime, timedelta
+    return render_template('dashboard.html', 
+                          students=students, 
+                          attendance=attendance,
+                          now=datetime.now,
+                          timedelta=timedelta)
+
+
+# -----------------------
+# API: Stats for Homepage
+# -----------------------
+@app.route('/api/stats')
+def api_stats():
+    """Get quick stats for homepage"""
+    total_students = Student.query.count()
+    total_records = Attendance.query.count()
+    
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_attendance = Attendance.query.filter(Attendance.timestamp >= today_start).count()
+    
+    # Check if model is trained
+    model_trained = os.path.exists(os.path.join(BASE_DIR, 'encodings.pkl'))
+    
+    return jsonify({
+        'total_students': total_students,
+        'today_attendance': today_attendance,
+        'total_records': total_records,
+        'model_trained': model_trained
+    })
+
+
+# -----------------------
+# API: Export Attendance to CSV
+# -----------------------
+@app.route('/api/export/csv')
+def export_csv():
+    """Export attendance records to CSV"""
+    attendance_records = Attendance.query.order_by(Attendance.timestamp.desc()).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Student Roll', 'Student Name', 'Timestamp', 'Date', 'Time'])
+    
+    for record in attendance_records:
+        writer.writerow([
+            record.id,
+            record.student.roll if record.student else 'N/A',
+            record.student.name if record.student else 'N/A',
+            record.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            record.timestamp.strftime('%Y-%m-%d'),
+            record.timestamp.strftime('%H:%M')
+        ])
+    
+    output.seek(0)
+    response = make_response(output.getvalue())
+    response.headers['Content-Disposition'] = f'attachment; filename=attendance_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+    response.headers['Content-type'] = 'text/csv'
+    return response
+
+
+# -----------------------
+# API: Delete Student
+# -----------------------
+@app.route('/api/student/<int:student_id>/delete', methods=['DELETE'])
+def delete_student(student_id):
+    """Delete a student and their attendance records"""
+    try:
+        student = Student.query.get_or_404(student_id)
+        
+        # Delete attendance records
+        Attendance.query.filter_by(student_id=student_id).delete()
+        
+        # Delete student
+        db.session.delete(student)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Student deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# -----------------------
+# API: Attendance Report
+# -----------------------
+@app.route('/api/attendance/report')
+def attendance_report():
+    """Get attendance report with filters"""
+    days = request.args.get('days', 7, type=int)
+    date_from = datetime.now() - timedelta(days=days)
+    
+    records = Attendance.query.filter(Attendance.timestamp >= date_from).all()
+    
+    # Group by date
+    report = {}
+    for record in records:
+        date_key = record.timestamp.strftime('%Y-%m-%d')
+        if date_key not in report:
+            report[date_key] = {'count': 0, 'students': []}
+        report[date_key]['count'] += 1
+        if record.student:
+            report[date_key]['students'].append({
+                'roll': record.student.roll,
+                'name': record.student.name
+            })
+    
+    return jsonify({'report': report, 'total': len(records)})
 
 
 # -----------------------
