@@ -6,3 +6,4 @@ face_recognition_models @ git+https://github.com/ageitgey/face_recognition_model
 numpy==1.26.2
 pillow==10.0.1
 Werkzeug==2.3.7
+gunicorn==21.2.0
