@@ -26,6 +26,11 @@ with app.app_context():
 # ROUTES
 # -----------------------
 
+@app.route('/health')
+def health():
+    """Health check endpoint for Railway"""
+    return jsonify({'status': 'healthy'}), 200
+
 @app.route('/')
 def index():
     return render_template('index.html')
