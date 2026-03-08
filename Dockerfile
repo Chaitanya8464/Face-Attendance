@@ -23,11 +23,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /app/dataset /app/instance
+RUN mkdir -p /app/dataset /app/instance /app/faces_known
 
 ENV FLASK_APP=app.py
 ENV PYTHONUNBUFFERED=1
 
+# Railway uses PORT env variable
 EXPOSE 8000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--timeout", "120", "--workers", "2", "app:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} --timeout 120 --workers 1 app:app"]
