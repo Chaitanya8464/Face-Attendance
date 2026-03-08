@@ -1,57 +1,133 @@
 {% extends 'base.html' %}
+
+{% block title %}Mark Attendance - Face Attendance{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-12">
-    <div class="card shadow border-0">
-      <div class="card-header bg-success text-white text-center py-4">
-        <h3 class="mb-0"><i class="fas fa-qrcode me-2"></i>Take Attendance</h3>
-      </div>
-      <div class="card-body p-4 text-center">
-        <div class="mb-4">
-          <i class="fas fa-camera fa-3x text-success mb-3"></i>
-          <h4 class="fw-bold">Face Recognition Attendance</h4>
-          <p class="text-muted">
-            Position yourself in front of the camera and click the button to capture your face for attendance marking.
-          </p>
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-12">
+      <!-- Header Card -->
+      <div class="card shadow-lg border-0 mb-4 animated">
+        <div class="card-body text-center p-4" style="background: var(--success-gradient); color: white;">
+          <i class="fas fa-camera fa-3x mb-3"></i>
+          <h2 class="fw-bold mb-2">Mark Attendance</h2>
+          <p class="mb-0 opacity-75">Position your face in front of the camera for automatic attendance marking</p>
         </div>
-        
-        <div class="row">
-          <div class="col-lg-8 mx-auto">
-            <div class="position-relative mb-4">
-              <video id="attendanceVideo" autoplay playsinline class="w-100 rounded shadow" style="max-height: 400px;"></video>
-              <div class="camera-overlay position-absolute top-0 start-0 w-100 h-100 rounded" style="border: 3px dashed rgba(255,255,255,0.5);"></div>
+      </div>
+
+      <div class="row g-4">
+        <!-- Camera Section -->
+        <div class="col-lg-8">
+          <div class="card shadow-lg border-0 animated">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="fas fa-video me-2"></i>Live Camera Feed</h5>
+              <span class="badge bg-success" id="camera-status">
+                <i class="fas fa-circle me-1 small"></i>Ready
+              </span>
+            </div>
+            
+            <div class="card-body p-0">
+              <div class="video-container position-relative">
+                <video id="attendanceVideo" autoplay playsinline class="w-100" style="min-height: 400px;"></video>
+                <div class="camera-frame"></div>
+                
+                <!-- Scanning animation overlay -->
+                <div id="scan-overlay" class="position-absolute top-0 start-0 w-100 h-100 d-none">
+                  <div style="
+                    position: absolute;
+                    width: 100%;
+                    height: 3px;
+                    background: linear-gradient(90deg, transparent, #38ef7d, transparent);
+                    animation: scan 2s linear infinite;
+                    box-shadow: 0 0 10px #38ef7d;
+                  "></div>
+                </div>
+              </div>
+              
+              <div class="card-body">
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                  <button id="startAttendance" class="btn btn-success btn-lg px-5">
+                    <i class="fas fa-play me-2"></i>Start Recognition
+                  </button>
+                  <button id="stopAttendance" class="btn btn-danger btn-lg px-5 d-none">
+                    <i class="fas fa-stop me-2"></i>Stop Recognition
+                  </button>
+                </div>
+                
+                <div class="text-center mt-3">
+                  <div id="status-indicator" class="spinner-border text-success d-none" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  <p id="status-text" class="text-muted mt-2 mb-0">Click "Start Recognition" to begin</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Info Card -->
+          <div class="card mt-3 border-0 shadow-sm animated">
+            <div class="card-body p-3">
+              <div class="row g-3">
+                <div class="col-md-4 text-center">
+                  <i class="fas fa-sun text-warning fa-2x mb-2"></i>
+                  <p class="small mb-0">Ensure good lighting</p>
+                </div>
+                <div class="col-md-4 text-center">
+                  <i class="fas fa-face-smile text-success fa-2x mb-2"></i>
+                  <p class="small mb-0">Face the camera directly</p>
+                </div>
+                <div class="col-md-4 text-center">
+                  <i class="fas fa-clock text-info fa-2x mb-2"></i>
+                  <p class="small mb-0">Hold position for 2 seconds</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
         
-        <div class="d-grid gap-3 mb-4">
-          <button id="startAttendance" class="btn btn-success btn-lg">
-            <i class="fas fa-eye me-2"></i>Start Recognition
-          </button>
-          <button id="stopAttendance" class="btn btn-danger btn-lg d-none">
-            <i class="fas fa-stop me-2"></i>Stop Recognition
-          </button>
-        </div>
-        
-        <div id="attendanceResult" class="mt-4">
-          <div class="alert alert-info d-none" role="alert">
-            <i class="fas fa-spinner fa-spin me-2"></i>Processing...
+        <!-- Results Section -->
+        <div class="col-lg-4">
+          <div class="card shadow-lg border-0 animated" style="animation-delay: 0.1s;">
+            <div class="card-header">
+              <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Detected Students</h5>
+            </div>
+            
+            <div class="card-body">
+              <div class="text-center py-4" id="no-results">
+                <i class="fas fa-user-slash fa-3x text-muted mb-3 opacity-50"></i>
+                <p class="text-muted mb-0">No students detected yet.<br>Start recognition to begin.</p>
+              </div>
+              
+              <div id="detected-list" class="list-group list-group-flush">
+                <!-- Detected students will appear here -->
+              </div>
+            </div>
+            
+            <div class="card-footer bg-light">
+              <div class="d-flex justify-content-between align-items-center small">
+                <span class="text-muted">Session Total:</span>
+                <span class="badge bg-success" id="session-count">0</span>
+              </div>
+            </div>
           </div>
-          <div class="alert alert-success d-none" role="alert">
-            <i class="fas fa-check-circle me-2"></i>Attendance marked successfully!
-          </div>
-          <div class="alert alert-warning d-none" role="alert">
-            <i class="fas fa-exclamation-triangle me-2"></i>No students recognized
-          </div>
-          <div class="alert alert-danger d-none" role="alert">
-            <i class="fas fa-exclamation-circle me-2"></i>Error occurred
-          </div>
-        </div>
-        
-        <div id="detectedStudents" class="mt-4">
-          <h5>Detected Students</h5>
-          <div class="list-group" id="studentList">
-            <!-- Detected students will appear here -->
+          
+          <!-- Today's Stats -->
+          <div class="card mt-3 border-0 shadow-sm animated" style="animation-delay: 0.2s;">
+            <div class="card-header bg-info text-white">
+              <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Today's Summary</h6>
+            </div>
+            <div class="card-body">
+              <div class="row text-center">
+                <div class="col-6">
+                  <h3 class="text-success mb-0" id="today-present">0</h3>
+                  <small class="text-muted">Present</small>
+                </div>
+                <div class="col-6">
+                  <h3 class="text-muted mb-0" id="today-total">0</h3>
+                  <small class="text-muted">Total</small>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -59,168 +135,169 @@
   </div>
 </div>
 
+<style>
+@keyframes scan {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
   let video = document.getElementById('attendanceVideo');
   let stream = null;
   let recognitionInterval = null;
+  let detectedStudents = new Set();
+  let sessionCount = 0;
   
-  // Initialize camera for attendance
-  async function initAttendanceCamera() {
+  // Initialize camera
+  async function initCamera() {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({video: true});
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        }
+      });
       video.srcObject = stream;
-      showNotification('Camera connected successfully!', 'success');
+      document.getElementById('camera-status').innerHTML = '<i class="fas fa-circle me-1 small"></i>Active';
+      document.getElementById('camera-status').classList.remove('bg-success');
+      document.getElementById('camera-status').classList.add('bg-info');
     } catch (err) {
-      console.error('Camera init failed', err);
-      showNotification('Could not access camera. Please allow camera permission or try a different browser.', 'error');
+      console.error('Camera error:', err);
+      showNotification('Camera access denied. Please allow permission.', 'error');
+      document.getElementById('camera-status').innerHTML = '<i class="fas fa-exclamation-triangle me-1 small"></i>Error';
+      document.getElementById('camera-status').classList.remove('bg-success');
+      document.getElementById('camera-status').classList.add('bg-danger');
     }
   }
   
-  // Start face recognition
-  document.getElementById('startAttendance').onclick = async () => {
-    // Show stop button and hide start button
-    document.getElementById('startAttendance').classList.add('d-none');
+  // Start recognition
+  document.getElementById('startAttendance').onclick = async function() {
+    this.classList.add('d-none');
     document.getElementById('stopAttendance').classList.remove('d-none');
+    document.getElementById('scan-overlay').classList.remove('d-none');
+    document.getElementById('status-text').textContent = 'Scanning for faces...';
+    document.getElementById('status-indicator').classList.remove('d-none');
     
-    // Start recognition every 2 seconds
-    recognitionInterval = setInterval(async () => {
-      const processingAlert = document.querySelector('.alert-info');
-      const successAlert = document.querySelector('.alert-success');
-      const warningAlert = document.querySelector('.alert-warning');
-      const dangerAlert = document.querySelector('.alert-danger');
-      const resultDiv = document.getElementById('attendanceResult');
-      const studentList = document.getElementById('studentList');
-      
-      // Reset alerts
-      processingAlert.classList.add('d-none');
-      successAlert.classList.add('d-none');
-      warningAlert.classList.add('d-none');
-      dangerAlert.classList.add('d-none');
-      
-      // Show processing
-      processingAlert.classList.remove('d-none');
-      
-      try {
-        // Capture frame from video
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 480;
-        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg');
-        
-        // Send to server for recognition
-        const res = await fetch('/api/recognize_attendance', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({image: dataUrl})
-        });
-        
-        const data = await res.json();
-        
-        processingAlert.classList.add('d-none');
-        
-        if(data.error) {
-          dangerAlert.classList.remove('d-none');
-          dangerAlert.querySelector('.fa-exclamation-circle').nextSibling.textContent = ` ${data.error}`;
-          return;
-        }
-        
-        if(!data.recognized || data.recognized.length === 0) {
-          // No students recognized, but not an error
-          if (!warningAlert.classList.contains('d-none')) {
-            warningAlert.classList.remove('d-none');
-          }
-          return;
-        }
-        
-        // Hide warning if students were recognized
-        warningAlert.classList.add('d-none');
-        successAlert.classList.remove('d-none');
-        
-        // Update student list
-        studentList.innerHTML = '';
-        data.recognized.forEach(m => {
-          const li = document.createElement('li');
-          li.className = 'list-group-item d-flex justify-content-between align-items-center';
-          li.innerHTML = `${m.roll} - ${m.name}<span class="badge bg-success">Present</span>`;
-          studentList.appendChild(li);
-        });
-        
-      } catch (error) {
-        processingAlert.classList.add('d-none');
-        dangerAlert.classList.remove('d-none');
-        dangerAlert.querySelector('.fa-exclamation-circle').nextSibling.textContent = ` Network error occurred`;
-      }
-    }, 2000); // Repeat every 2 seconds
+    // Recognize every 2 seconds
+    recognitionInterval = setInterval(performRecognition, 2000);
+    
+    // First recognition immediately
+    performRecognition();
   };
   
-  // Stop face recognition
-  document.getElementById('stopAttendance').onclick = () => {
+  // Stop recognition
+  document.getElementById('stopAttendance').onclick = function() {
+    stopRecognition();
+  };
+  
+  function stopRecognition() {
     if (recognitionInterval) {
       clearInterval(recognitionInterval);
       recognitionInterval = null;
     }
     
-    // Show start button and hide stop button
-    document.getElementById('stopAttendance').classList.add('d-none');
     document.getElementById('startAttendance').classList.remove('d-none');
-    
-    // Hide alerts
-    document.querySelectorAll('.alert').forEach(alert => alert.classList.add('d-none'));
-  };
-  
-  // Initialize camera when page loads
-  document.addEventListener('DOMContentLoaded', initAttendanceCamera);
-  
-  // Helper function to show notifications
-  function showNotification(message, type = 'info') {
-    // Remove existing notification if any
-    const existingAlert = document.querySelector('.notification-toast');
-    if (existingAlert) existingAlert.remove();
-    
-    const alertTypes = {
-      success: 'bg-success',
-      error: 'bg-danger',
-      info: 'bg-info',
-      warning: 'bg-warning'
-    };
-    
-    const alertClass = alertTypes[type] || 'bg-info';
-    
-    // Create toast notification
-    const toastHTML = `
-      <div class="position-fixed bottom-0 end-0 p-3 notification-toast" style="z-index: 11">
-        <div class="toast ${alertClass} text-white" role="alert">
-          <div class="toast-body">
-            <i class="fas me-2"></i>
-            ${message}
-          </div>
-        </div>
-      </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', toastHTML);
-    
-    const toastEl = document.querySelector('.notification-toast .toast');
-    const icon = toastEl.querySelector('.fas');
-    
-    // Set icon based on type
-    icon.className = `fas me-2 ${
-      type === 'success' ? 'fa-check-circle' : 
-      type === 'error' ? 'fa-exclamation-circle' : 
-      type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'
-    }`;
-    
-    // Show toast
-    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
-    toast.show();
-    
-    // Remove after animation
-    setTimeout(() => {
-      if (document.querySelector('.notification-toast')) {
-        document.querySelector('.notification-toast').remove();
-      }
-    }, 3500);
+    document.getElementById('stopAttendance').classList.add('d-none');
+    document.getElementById('scan-overlay').classList.add('d-none');
+    document.getElementById('status-indicator').classList.add('d-none');
+    document.getElementById('status-text').textContent = 'Recognition stopped';
   }
+  
+  // Perform face recognition
+  async function performRecognition() {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg');
+      
+      const response = await fetch('/api/recognize_attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataUrl })
+      });
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        console.error('Recognition error:', data.error);
+        return;
+      }
+      
+      // Update detected list
+      const detectedList = document.getElementById('detected-list');
+      const noResults = document.getElementById('no-results');
+      
+      if (data.recognized && data.recognized.length > 0) {
+        if (noResults) noResults.style.display = 'none';
+        
+        data.recognized.forEach(student => {
+          const key = `${student.roll}-${student.name}`;
+          if (!detectedStudents.has(key)) {
+            detectedStudents.add(key);
+            sessionCount++;
+            
+            const item = document.createElement('div');
+            item.className = 'list-group-item d-flex justify-content-between align-items-center animated fade-in';
+            item.innerHTML = `
+              <div>
+                <div class="fw-bold text-primary">${student.roll}</div>
+                <small class="text-muted">${student.name}</small>
+              </div>
+              <span class="badge bg-success"><i class="fas fa-check me-1"></i>Marked</span>
+            `;
+            detectedList.appendChild(item);
+            
+            document.getElementById('session-count').textContent = sessionCount;
+            
+            // Show success notification
+            showNotification(`${student.name} (${student.roll}) - Attendance marked!`, 'success');
+            
+            // Trigger confetti for first detection
+            if (sessionCount === 1) {
+              triggerConfetti();
+            }
+          }
+        });
+      }
+      
+    } catch (error) {
+      console.error('Recognition failed:', error);
+    }
+  }
+  
+  // Load today's stats
+  async function loadTodayStats() {
+    try {
+      const response = await fetch('/api/stats');
+      const data = await response.json();
+      document.getElementById('today-present').textContent = data.today_attendance || 0;
+      document.getElementById('today-total').textContent = data.total_records || 0;
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  }
+  
+  // Initialize on load
+  document.addEventListener('DOMContentLoaded', () => {
+    initCamera();
+    loadTodayStats();
+  });
+  
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    if (recognitionInterval) {
+      clearInterval(recognitionInterval);
+    }
+  });
 </script>
 {% endblock %}
