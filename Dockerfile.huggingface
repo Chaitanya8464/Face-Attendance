@@ -1,38 +1,38 @@
-# Dockerfile for Hugging Face Spaces
-# Optimized for fast builds with pre-built wheels
+# Hugging Face Spaces Dockerfile
+# Optimized for fast builds with pre-built face_recognition
 
-FROM python:3.11-slim
+FROM ghcr.io/justadudewhohacks/face_recognition:latest
+
+# Set working directory
+WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    cmake \
-    build-essential \
+    git \
     libopenblas-dev \
-    libblas-dev \
-    liblapack-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
-# Install numpy first (required by dlib)
-RUN pip install --no-cache-dir numpy==1.26.2
-
-# Install dlib from source (will be cached by HF)
-RUN pip install --no-cache-dir dlib==19.24.2
-
-# Install remaining dependencies
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy minimal requirements (no dlib/face_recognition needed)
+COPY backend/requirements_minimal.txt .
+RUN pip install --no-cache-dir -r requirements_minimal.txt
 
 # Copy application code
-COPY . .
+COPY backend/ ./backend/
+COPY frontend/ ./frontend/
+
+# Create directories
+RUN mkdir -p /app/backend/dataset /app/backend/instance /app/backend/faces_known
+
+# Environment variables
+ENV FLASK_APP=backend/app/app.py
+ENV PYTHONUNBUFFERED=1
 
 # Hugging Face Spaces uses port 7860
 EXPOSE 7860
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:7860/health')"
+    CMD python -c "import requests; requests.get('http://localhost:7860/health')" || exit 1
 
 # Run with gunicorn
 CMD ["gunicorn", "--bind", "0.0.0.0:7860", "--timeout", "120", "--workers", "1", "backend.app.app:app"]
