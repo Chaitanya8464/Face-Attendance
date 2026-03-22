@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management - Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="fw-bold"><i class="fas fa-users-cog me-2"></i>User Management</h1>
+      <p class="text-muted">Manage all user accounts</p>
+    </div>
+    <div>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Users Table -->
+  <div class="card animated">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Verified</th>
+              <th>Status</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+            <tr>
+              <td>{{ user.id }}</td>
+              <td>
+                <strong>{{ user.username }}</strong>
+                {% if user.is_admin() %}
+                <span class="badge bg-danger ms-1">Admin</span>
+                {% endif %}
+              </td>
+              <td>{{ user.email }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('admin_change_role', user_id=user.id) }}" class="d-inline">
+                  <select name="role" class="form-select form-select-sm" onchange="this.form.submit()" {% if user.is_admin() %}disabled{% endif %}>
+                    <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                    <option value="teacher" {% if user.role == 'teacher' %}selected{% endif %}>Teacher</option>
+                    <option value="student" {% if user.role == 'student' %}selected{% endif %}>Student</option>
+                  </select>
+                </form>
+              </td>
+              <td>
+                {% if user.is_verified %}
+                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Verified</span>
+                {% else %}
+                <span class="badge bg-warning"><i class="fas fa-clock me-1"></i>Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if user.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-danger">Inactive</span>
+                {% endif %}
+              </td>
+              <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <!-- Activate/Deactivate -->
+                  <form method="POST" action="{{ url_for('admin_activate_user', user_id=user.id) }}" class="d-inline">
+                    <button type="submit" class="btn {% if user.is_active %}btn-warning{% else %}btn-success{% endif %}" 
+                            title="{% if user.is_active %}Deactivate{% else %}Activate{% endif %}"
+                            {% if user.is_admin() %}disabled{% endif %}>
+                      <i class="fas fa-{% if user.is_active %}ban{% else %}check{% endif %}"></i>
+                    </button>
+                  </form>
+                  
+                  <!-- Delete -->
+                  {% if not user.is_admin() %}
+                  <button type="button" class="btn btn-danger" 
+                          onclick="confirmDelete({{ user.id }}, '{{ user.username }}')"
+                          title="Delete User">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete user <strong id="deleteUsername"></strong>?</p>
+        <p class="text-danger small">This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteForm" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-danger">Delete User</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmDelete(userId, username) {
+  document.getElementById('deleteUsername').textContent = username;
+  document.getElementById('deleteForm').action = '/admin/users/' + userId + '/delete';
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+{% endblock %}

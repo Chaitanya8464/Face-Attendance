@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}My Attendance History - {{ student.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Student Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="fw-bold"><i class="fas fa-clipboard-list me-2"></i>My Attendance History</h1>
+      <p class="text-muted">{{ student.name }} - {{ student.roll }}</p>
+    </div>
+    <div>
+      <a href="{{ url_for('student_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="row g-4 mb-4">
+    <div class="col-md-3">
+      <div class="card stat-card primary animated">
+        <div class="card-body text-center">
+          <i class="fas fa-calendar-check"></i>
+          <h3>{{ total_attendance }}</h3>
+          <p>Total Attendance</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card {% if attendance_percentage >= 75 %}success{% elif attendance_percentage >= 50 %}warning{% else %}danger{% endif %} animated">
+        <div class="card-body text-center">
+          <i class="fas fa-chart-pie"></i>
+          <h3>{{ attendance_percentage }}%</h3>
+          <p>Attendance %</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card {% if marked_today %}success{% else %}secondary{% endif %} animated">
+        <div class="card-body text-center">
+          <i class="fas fa-clock"></i>
+          <h3>{% if marked_today %}Yes{% else %}No{% endif %}</h3>
+          <p>Present Today</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card info animated">
+        <div class="card-body text-center">
+          <i class="fas fa-user-check"></i>
+          <h3>{{ attendance|selectattr('marked_by_name')|list|length }}</h3>
+          <p>By Teacher/Admin</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance History Table -->
+  <div class="card animated">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="fas fa-list me-2"></i>Complete Attendance History</span>
+      <span class="badge bg-primary">{{ attendance|length }} Records</span>
+    </div>
+    <div class="card-body">
+      {% if attendance %}
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Day</th>
+              <th>Marked By</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in attendance %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>
+                <strong>{{ record.timestamp.strftime('%Y-%m-%d') }}</strong>
+              </td>
+              <td>
+                <span class="badge bg-primary">
+                  <i class="fas fa-clock me-1"></i>{{ record.timestamp.strftime('%H:%M') }}
+                </span>
+              </td>
+              <td>{{ record.timestamp.strftime('%A') }}</td>
+              <td>
+                {% if record.marked_by_name %}
+                  <span class="badge bg-primary">
+                    <i class="fas fa-user-check me-1"></i>{{ record.marked_by_name }}
+                  </span>
+                {% else %}
+                  <span class="badge bg-info">
+                    <i class="fas fa-user me-1"></i>Self
+                  </span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge bg-success">
+                  <i class="fas fa-check-circle me-1"></i>Present
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="fas fa-calendar-times fa-4x mb-3"></i>
+        <h4>No attendance records yet</h4>
+        <p>Mark your attendance using the face recognition system</p>
+        <a href="{{ url_for('attendance_page') }}" class="btn btn-primary">
+          <i class="fas fa-camera me-2"></i>Mark Attendance Now
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Information Cards -->
+  <div class="row g-4 mt-4">
+    <div class="col-md-6">
+      <div class="card animated">
+        <div class="card-header bg-info">
+          <i class="fas fa-info-circle me-2"></i>Attendance Information
+        </div>
+        <div class="card-body">
+          <p><strong>Marked By:</strong> Shows who marked your attendance:</p>
+          <ul class="mb-0">
+            <li><span class="badge bg-primary">Teacher Name</span> - Marked by teacher/admin</li>
+            <li><span class="badge bg-info">Self</span> - Self-marked via face recognition</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card animated">
+        <div class="card-header bg-success">
+          <i class="fas fa-chart-line me-2"></i>Attendance Percentage
+        </div>
+        <div class="card-body">
+          <p>Your attendance percentage is calculated based on the last 30 days:</p>
+          <ul class="mb-0">
+            <li><span class="badge bg-success">≥75%</span> - Good attendance</li>
+            <li><span class="badge bg-warning">50-74%</span> - Needs improvement</li>
+            <li><span class="badge bg-danger">&lt;50%</span> - Low attendance</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

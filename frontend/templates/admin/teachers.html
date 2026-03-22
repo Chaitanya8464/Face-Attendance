@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+
+{% block title %}Teacher Management - Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="fw-bold"><i class="fas fa-chalkboard-teacher me-2"></i>Teacher Management</h1>
+      <p class="text-muted">Manage teacher accounts and view their attendance records</p>
+    </div>
+    <div>
+      <a href="{{ url_for('admin_add_teacher') }}" class="btn btn-primary">
+        <i class="fas fa-user-plus me-2"></i>Add New Teacher
+      </a>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="row g-4 mb-4">
+    <div class="col-md-4">
+      <div class="card stat-card primary animated">
+        <div class="card-body text-center">
+          <i class="fas fa-users"></i>
+          <h3>{{ teacher_stats|length }}</h3>
+          <p>Total Teachers</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card success animated">
+        <div class="card-body text-center">
+          <i class="fas fa-user-check"></i>
+          <h3>{{ teacher_stats|selectattr('total_marked', 'gt', 0)|list|length }}</h3>
+          <p>Active Teachers</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card info animated">
+        <div class="card-body text-center">
+          <i class="fas fa-clipboard-check"></i>
+          <h3>{{ teacher_stats|sum(attribute='total_marked') }}</h3>
+          <p>Total Attendance Marked</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Teachers Table -->
+  <div class="card animated">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="fas fa-list me-2"></i>Registered Teachers</span>
+      <a href="{{ url_for('admin_add_teacher') }}" class="btn btn-sm btn-primary">
+        <i class="fas fa-user-plus me-1"></i>Add Teacher
+      </a>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Teacher ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Joined</th>
+              <th>Attendance Marked</th>
+              <th>Last 30 Days</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for stat in teacher_stats %}
+            {% set teacher = stat.teacher %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>
+                {% if teacher.teacher_id %}
+                  <span class="badge bg-primary font-monospace">{{ teacher.teacher_id }}</span>
+                {% else %}
+                  <span class="badge bg-secondary">N/A</span>
+                {% endif %}
+              </td>
+              <td><strong>{{ teacher.username }}</strong></td>
+              <td>{{ teacher.email }}</td>
+              <td>{{ teacher.created_at.strftime('%Y-%m-%d') }}</td>
+              <td>
+                <span class="badge bg-primary">
+                  <i class="fas fa-clipboard-check me-1"></i>{{ stat.total_marked }}
+                </span>
+              </td>
+              <td>
+                <span class="badge bg-info">
+                  <i class="fas fa-calendar-alt me-1"></i>{{ stat.recent_marked }}
+                </span>
+              </td>
+              <td>
+                {% if teacher.is_active %}
+                  <span class="badge bg-success">
+                    <i class="fas fa-check-circle me-1"></i>Active
+                  </span>
+                {% else %}
+                  <span class="badge bg-danger">
+                    <i class="fas fa-times-circle me-1"></i>Inactive
+                  </span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <a href="{{ url_for('admin_teacher_details', teacher_id=teacher.id) }}" 
+                     class="btn btn-info" title="View Details">
+                    <i class="fas fa-eye"></i>
+                  </a>
+                  <a href="{{ url_for('admin_edit_teacher', teacher_id=teacher.id) }}" 
+                     class="btn btn-warning" title="Edit">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <button type="button" class="btn btn-danger" 
+                          onclick="confirmDelete({{ teacher.id }}, '{{ teacher.username }}')"
+                          title="Delete">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="9" class="text-center text-muted py-4">
+                <i class="fas fa-user-slash fa-3x mb-3"></i>
+                <p>No teachers registered yet.</p>
+                <a href="{{ url_for('admin_add_teacher') }}" class="btn btn-primary">
+                  <i class="fas fa-user-plus me-2"></i>Add First Teacher
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Information Cards -->
+  <div class="row g-4 mt-4">
+    <div class="col-md-6">
+      <div class="card animated">
+        <div class="card-header bg-info">
+          <i class="fas fa-info-circle me-2"></i>Teacher Permissions
+        </div>
+        <div class="card-body">
+          <p>Teachers can:</p>
+          <ul class="mb-0">
+            <li>Mark attendance for students</li>
+            <li>View attendance records they marked</li>
+            <li>Register new students</li>
+            <li>Train the face recognition model</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card animated">
+        <div class="card-header bg-primary">
+          <i class="fas fa-shield-alt me-2"></i>Admin Controls
+        </div>
+        <div class="card-body">
+          <p>As an admin, you can:</p>
+          <ul class="mb-0">
+            <li>View all teachers and their activity</li>
+            <li>See which teacher marked which attendance</li>
+            <li>Edit teacher details</li>
+            <li>Deactivate/delete teacher accounts</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Confirm Delete</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-circle me-2"></i>
+          <strong>Warning:</strong> This action cannot be undone!
+        </div>
+        <p>Are you sure you want to delete the teacher <strong id="deleteTeacherName"></strong>?</p>
+        <p class="text-danger small">Note: Teachers with attendance records cannot be deleted.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteForm" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-danger">
+            <i class="fas fa-trash me-2"></i>Delete Teacher
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmDelete(id, name) {
+  document.getElementById('deleteTeacherName').textContent = name;
+  document.getElementById('deleteForm').action = `/admin/teachers/${id}/delete`;
+  
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+{% endblock %}

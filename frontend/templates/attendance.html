@@ -1,0 +1,337 @@
+{% extends 'base.html' %}
+
+{% block title %}Mark Attendance - Face Attendance{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-12">
+      <!-- Header Card -->
+      <div class="card shadow-lg border-0 mb-4 animated">
+        <div class="card-body text-center p-4" style="background: var(--success-gradient); color: white;">
+          <i class="fas fa-camera fa-3x mb-3"></i>
+          <h2 class="fw-bold mb-2">Mark Attendance</h2>
+          <p class="mb-0 opacity-75">Position your face in front of the camera for automatic attendance marking</p>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <!-- Camera Section -->
+        <div class="col-lg-8">
+          <div class="card shadow-lg border-0 animated">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="fas fa-video me-2"></i>Live Camera Feed</h5>
+              <span class="badge bg-success" id="camera-status">
+                <i class="fas fa-circle me-1 small"></i>Ready
+              </span>
+            </div>
+            
+            <div class="card-body p-0">
+              <div class="video-container position-relative">
+                <video id="attendanceVideo" autoplay playsinline class="w-100" style="min-height: 400px;"></video>
+                <div class="camera-frame"></div>
+                
+                <!-- Scanning animation overlay -->
+                <div id="scan-overlay" class="position-absolute top-0 start-0 w-100 h-100 d-none">
+                  <div style="
+                    position: absolute;
+                    width: 100%;
+                    height: 3px;
+                    background: linear-gradient(90deg, transparent, #38ef7d, transparent);
+                    animation: scan 2s linear infinite;
+                    box-shadow: 0 0 10px #38ef7d;
+                  "></div>
+                </div>
+              </div>
+              
+              <div class="card-body">
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                  <button id="startAttendance" class="btn btn-success btn-lg px-5">
+                    <i class="fas fa-play me-2"></i>Start Recognition
+                  </button>
+                  <button id="stopAttendance" class="btn btn-danger btn-lg px-5 d-none">
+                    <i class="fas fa-stop me-2"></i>Stop Recognition
+                  </button>
+                </div>
+                
+                <div class="text-center mt-3">
+                  <div id="status-indicator" class="spinner-border text-success d-none" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  <p id="status-text" class="text-muted mt-2 mb-0">Click "Start Recognition" to begin</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Info Card -->
+          <div class="card mt-3 border-0 shadow-sm animated">
+            <div class="card-body p-3">
+              <div class="row g-3">
+                <div class="col-md-4 text-center">
+                  <i class="fas fa-sun text-warning fa-2x mb-2"></i>
+                  <p class="small mb-0">Ensure good lighting</p>
+                </div>
+                <div class="col-md-4 text-center">
+                  <i class="fas fa-face-smile text-success fa-2x mb-2"></i>
+                  <p class="small mb-0">Face the camera directly</p>
+                </div>
+                <div class="col-md-4 text-center">
+                  <i class="fas fa-clock text-info fa-2x mb-2"></i>
+                  <p class="small mb-0">Hold position for 2 seconds</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="col-lg-4">
+          <div class="card shadow-lg border-0 animated" style="animation-delay: 0.1s;">
+            <div class="card-header">
+              <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Detected Students</h5>
+            </div>
+            
+            <div class="card-body">
+              <div class="text-center py-4" id="no-results">
+                <i class="fas fa-user-slash fa-3x text-muted mb-3 opacity-50"></i>
+                <p class="text-muted mb-0">No students detected yet.<br>Start recognition to begin.</p>
+              </div>
+              
+              <div id="detected-list" class="list-group list-group-flush">
+                <!-- Detected students will appear here -->
+              </div>
+            </div>
+            
+            <div class="card-footer bg-light">
+              <div class="d-flex justify-content-between align-items-center small">
+                <span class="text-muted">Session Total:</span>
+                <span class="badge bg-success" id="session-count">0</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Today's Stats -->
+          <div class="card mt-3 border-0 shadow-sm animated" style="animation-delay: 0.2s;">
+            <div class="card-header bg-info text-white">
+              <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Today's Summary</h6>
+            </div>
+            <div class="card-body">
+              <div class="row text-center">
+                <div class="col-6">
+                  <h3 class="text-success mb-0" id="today-present">0</h3>
+                  <small class="text-muted">Present</small>
+                </div>
+                <div class="col-6">
+                  <h3 class="text-muted mb-0" id="today-total">0</h3>
+                  <small class="text-muted">Total</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes scan {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let video = document.getElementById('attendanceVideo');
+  let stream = null;
+  let recognitionInterval = null;
+  let detectedStudents = new Set();
+  let sessionCount = 0;
+  
+  // Initialize camera
+  async function initCamera() {
+    try {
+      // Check browser support
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Your browser does not support camera access. Please use Chrome, Firefox, or Edge.');
+      }
+
+      // Check for secure context
+      if (!window.isSecureContext && window.location.protocol !== 'file:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        console.warn('⚠️ Warning: Camera access requires HTTPS or localhost');
+        console.warn('Current protocol:', window.location.protocol);
+        console.warn('Current hostname:', window.location.hostname);
+      }
+
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        }
+      });
+      video.srcObject = stream;
+      document.getElementById('camera-status').innerHTML = '<i class="fas fa-circle me-1 small"></i>Active';
+      document.getElementById('camera-status').classList.remove('bg-success');
+      document.getElementById('camera-status').classList.add('bg-info');
+      showNotification('Camera initialized successfully!', 'success');
+    } catch (err) {
+      console.error('Camera error:', err);
+      console.error('Error name:', err.name);
+      console.error('Error message:', err.message);
+      
+      let errorMessage = 'Camera access failed. ';
+      
+      if (err.name === 'NotAllowedError') {
+        errorMessage += 'Please allow camera permission in your browser settings.';
+      } else if (err.name === 'NotFoundError') {
+        errorMessage += 'No camera found. Please connect a camera.';
+      } else if (err.name === 'NotReadableError') {
+        errorMessage += 'Camera is being used by another application.';
+      } else if (err.name === 'SecurityError') {
+        errorMessage += 'Camera access requires HTTPS or localhost.';
+      } else {
+        errorMessage += err.message;
+      }
+      
+      showNotification(errorMessage, 'error');
+      document.getElementById('camera-status').innerHTML = '<i class="fas fa-exclamation-triangle me-1 small"></i>Error';
+      document.getElementById('camera-status').classList.remove('bg-success');
+      document.getElementById('camera-status').classList.add('bg-danger');
+      
+      // Disable start button
+      document.getElementById('startAttendance').disabled = true;
+      document.getElementById('startAttendance').title = 'Camera not available';
+    }
+  }
+  
+  // Start recognition
+  document.getElementById('startAttendance').onclick = async function() {
+    this.classList.add('d-none');
+    document.getElementById('stopAttendance').classList.remove('d-none');
+    document.getElementById('scan-overlay').classList.remove('d-none');
+    document.getElementById('status-text').textContent = 'Scanning for faces...';
+    document.getElementById('status-indicator').classList.remove('d-none');
+    
+    // Recognize every 2 seconds
+    recognitionInterval = setInterval(performRecognition, 2000);
+    
+    // First recognition immediately
+    performRecognition();
+  };
+  
+  // Stop recognition
+  document.getElementById('stopAttendance').onclick = function() {
+    stopRecognition();
+  };
+  
+  function stopRecognition() {
+    if (recognitionInterval) {
+      clearInterval(recognitionInterval);
+      recognitionInterval = null;
+    }
+    
+    document.getElementById('startAttendance').classList.remove('d-none');
+    document.getElementById('stopAttendance').classList.add('d-none');
+    document.getElementById('scan-overlay').classList.add('d-none');
+    document.getElementById('status-indicator').classList.add('d-none');
+    document.getElementById('status-text').textContent = 'Recognition stopped';
+  }
+  
+  // Perform face recognition
+  async function performRecognition() {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg');
+      
+      const response = await fetch('/api/recognize_attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataUrl })
+      });
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        console.error('Recognition error:', data.error);
+        return;
+      }
+      
+      // Update detected list
+      const detectedList = document.getElementById('detected-list');
+      const noResults = document.getElementById('no-results');
+      
+      if (data.recognized && data.recognized.length > 0) {
+        if (noResults) noResults.style.display = 'none';
+        
+        data.recognized.forEach(student => {
+          const key = `${student.roll}-${student.name}`;
+          if (!detectedStudents.has(key)) {
+            detectedStudents.add(key);
+            sessionCount++;
+            
+            const item = document.createElement('div');
+            item.className = 'list-group-item d-flex justify-content-between align-items-center animated fade-in';
+            item.innerHTML = `
+              <div>
+                <div class="fw-bold text-primary">${student.roll}</div>
+                <small class="text-muted">${student.name}</small>
+              </div>
+              <span class="badge bg-success"><i class="fas fa-check me-1"></i>Marked</span>
+            `;
+            detectedList.appendChild(item);
+            
+            document.getElementById('session-count').textContent = sessionCount;
+            
+            // Show success notification
+            showNotification(`${student.name} (${student.roll}) - Attendance marked!`, 'success');
+            
+            // Trigger confetti for first detection
+            if (sessionCount === 1) {
+              triggerConfetti();
+            }
+          }
+        });
+      }
+      
+    } catch (error) {
+      console.error('Recognition failed:', error);
+    }
+  }
+  
+  // Load today's stats
+  async function loadTodayStats() {
+    try {
+      const response = await fetch('/api/stats');
+      const data = await response.json();
+      document.getElementById('today-present').textContent = data.today_attendance || 0;
+      document.getElementById('today-total').textContent = data.total_records || 0;
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  }
+  
+  // Initialize on load
+  document.addEventListener('DOMContentLoaded', () => {
+    initCamera();
+    loadTodayStats();
+  });
+  
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    if (recognitionInterval) {
+      clearInterval(recognitionInterval);
+    }
+  });
+</script>
+{% endblock %}

@@ -39,10 +39,14 @@ instance/
 .env.local
 .env.*.local
 
-# Dataset and generated files
-dataset/
-encodings.pkl
-static/uploads/
+# Dataset and generated files (backend)
+backend/dataset/
+backend/encodings.pkl
+backend/static/uploads/
+
+# Database (backend)
+backend/*.db
+backend/instance/
 
 # OS
 .DS_Store
@@ -55,3 +59,17 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Development
+*.orig
+.env.backup
+
+# Frontend (ignored - served by backend)
+# frontend/templates/
+# frontend/static/

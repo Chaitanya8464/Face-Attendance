@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Diagnostic Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        
+        .test-section h2 {
+            color: #495057;
+            font-size: 18px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+        
+        .status.pass {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.fail {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .test-result {
+            margin: 10px 0;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #dee2e6;
+        }
+        
+        .test-result.pass {
+            border-left-color: #28a745;
+        }
+        
+        .test-result.fail {
+            border-left-color: #dc3545;
+        }
+        
+        .test-result.warning {
+            border-left-color: #ffc107;
+        }
+        
+        .icon {
+            margin-right: 8px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 10px 5px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        button.secondary {
+            background: #6c757d;
+        }
+        
+        #video {
+            width: 100%;
+            max-width: 640px;
+            border-radius: 12px;
+            background: #000;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        #video.active {
+            display: block;
+        }
+        
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .info-item label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        
+        .info-item value {
+            font-size: 16px;
+            color: #212529;
+            font-weight: 600;
+        }
+        
+        .log-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        
+        .log-entry.info { color: #569cd6; }
+        .log-entry.success { color: #6a9955; }
+        .log-entry.warning { color: #dcdcaa; }
+        .log-entry.error { color: #f44747; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📷 Camera Diagnostic Test</h1>
+        <p class="subtitle">Test your camera setup for the Face Attendance System</p>
+        
+        <!-- Browser Info -->
+        <div class="test-section">
+            <h2>
+                <span>🔍 Browser Information</span>
+                <span class="status info" id="browser-status">Checking...</span>
+            </h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>User Agent</label><br>
+                    <value id="user-agent">-</value>
+                </div>
+                <div class="info-item">
+                    <label>Protocol</label><br>
+                    <value id="protocol">-</value>
+                </div>
+                <div class="info-item">
+                    <label>Hostname</label><br>
+                    <value id="hostname">-</value>
+                </div>
+                <div class="info-item">
+                    <label>Secure Context</label><br>
+                    <value id="secure-context">-</value>
+                </div>
+            </div>
+        </div>
+        
+        <!-- API Support Test -->
+        <div class="test-section">
+            <h2>
+                <span>🔧 API Support Test</span>
+                <span class="status" id="api-status">Checking...</span>
+            </h2>
+            <div id="api-results"></div>
+        </div>
+        
+        <!-- Camera Test -->
+        <div class="test-section">
+            <h2>
+                <span>📹 Camera Access Test</span>
+                <span class="status" id="camera-status">Not tested</span>
+            </h2>
+            <video id="video" autoplay playsinline></video>
+            <div class="button-group">
+                <button id="test-camera-btn" onclick="testCamera()">
+                    <span class="icon">🎥</span> Test Camera
+                </button>
+                <button class="secondary" onclick="stopCamera()">
+                    <span class="icon">⏹️</span> Stop Camera
+                </button>
+            </div>
+            <div id="camera-results"></div>
+        </div>
+        
+        <!-- Logs -->
+        <div class="test-section">
+            <h2>📋 Debug Logs</h2>
+            <div class="log-output" id="log-output"></div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="button-group" style="margin-top: 30px;">
+            <button onclick="runAllTests()">
+                <span class="icon">🚀</span> Run All Tests
+            </button>
+            <button class="secondary" onclick="location.href='/'">
+                <span class="icon">🏠</span> Back to Home
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        const logOutput = document.getElementById('log-output');
+        const video = document.getElementById('video');
+        let currentStream = null;
+        
+        // Logging utility
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+            console.log(message);
+        }
+        
+        // Display browser information
+        function displayBrowserInfo() {
+            document.getElementById('user-agent').textContent = navigator.userAgent.substring(0, 50) + '...';
+            document.getElementById('protocol').textContent = window.location.protocol;
+            document.getElementById('hostname').textContent = window.location.hostname || 'localhost';
+            
+            const isSecure = window.isSecureContext;
+            const secureEl = document.getElementById('secure-context');
+            secureEl.textContent = isSecure ? 'Yes ✓' : 'No ✗';
+            secureEl.className = isSecure ? 'status pass' : 'status warning';
+            
+            document.getElementById('browser-status').className = 'status pass';
+            document.getElementById('browser-status').textContent = 'Complete';
+            
+            log('Browser information collected', 'success');
+            log(`Protocol: ${window.location.protocol}`, 'info');
+            log(`Hostname: ${window.location.hostname}`, 'info');
+            log(`Secure Context: ${isSecure}`, isSecure ? 'success' : 'warning');
+        }
+        
+        // Test API support
+        function testAPISupport() {
+            const results = document.getElementById('api-results');
+            const statusEl = document.getElementById('api-status');
+            let allPassed = true;
+            
+            // Test navigator.mediaDevices
+            const hasMediaDevices = !!navigator.mediaDevices;
+            results.innerHTML += `
+                <div class="test-result ${hasMediaDevices ? 'pass' : 'fail'}">
+                    <strong>${hasMediaDevices ? '✓' : '✗'}</strong>
+                    navigator.mediaDevices: ${hasMediaDevices ? 'Available' : 'Not Available'}
+                </div>
+            `;
+            
+            if (!hasMediaDevices) {
+                allPassed = false;
+                log('navigator.mediaDevices not available', 'error');
+            } else {
+                log('navigator.mediaDevices available', 'success');
+            }
+            
+            // Test getUserMedia
+            const hasGetUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            results.innerHTML += `
+                <div class="test-result ${hasGetUserMedia ? 'pass' : 'fail'}">
+                    <strong>${hasGetUserMedia ? '✓' : '✗'}</strong>
+                    getUserMedia: ${hasGetUserMedia ? 'Supported' : 'Not Supported'}
+                </div>
+            `;
+            
+            if (!hasGetUserMedia) {
+                allPassed = false;
+                log('getUserMedia not supported', 'error');
+            } else {
+                log('getUserMedia supported', 'success');
+            }
+            
+            // Test permissions API
+            const hasPermissions = !!navigator.permissions;
+            results.innerHTML += `
+                <div class="test-result ${hasPermissions ? 'pass' : 'warning'}">
+                    <strong>${hasPermissions ? '✓' : '⚠'}</strong>
+                    Permissions API: ${hasPermissions ? 'Available' : 'Not Available (optional)'}
+                </div>
+            `;
+            
+            if (hasPermissions) {
+                log('Permissions API available', 'success');
+            } else {
+                log('Permissions API not available (optional feature)', 'warning');
+            }
+            
+            statusEl.className = `status ${allPassed ? 'pass' : 'fail'}`;
+            statusEl.textContent = allPassed ? 'Passed' : 'Failed';
+            
+            return allPassed;
+        }
+        
+        // Test camera access
+        async function testCamera() {
+            const statusEl = document.getElementById('camera-status');
+            const results = document.getElementById('camera-results');
+            
+            statusEl.className = 'status info';
+            statusEl.textContent = 'Testing...';
+            
+            try {
+                log('Requesting camera access...', 'info');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    }
+                });
+                
+                currentStream = stream;
+                video.srcObject = stream;
+                video.classList.add('active');
+                
+                statusEl.className = 'status pass';
+                statusEl.textContent = 'Success';
+                
+                results.innerHTML = `
+                    <div class="test-result pass">
+                        <strong>✓</strong>
+                        Camera accessed successfully!
+                    </div>
+                    <div class="test-result pass">
+                        <strong>✓</strong>
+                        Video stream active
+                    </div>
+                `;
+                
+                log('Camera test passed!', 'success');
+                log(`Video dimensions: ${video.videoWidth}x${video.videoHeight}`, 'info');
+                
+            } catch (err) {
+                console.error('Camera test failed:', err);
+                
+                statusEl.className = 'status fail';
+                statusEl.textContent = 'Failed';
+                
+                let errorMsg = err.message;
+                if (err.name === 'NotAllowedError') {
+                    errorMsg = 'Permission denied. Please allow camera access.';
+                } else if (err.name === 'NotFoundError') {
+                    errorMsg = 'No camera found.';
+                } else if (err.name === 'NotReadableError') {
+                    errorMsg = 'Camera is being used by another application.';
+                } else if (err.name === 'SecurityError') {
+                    errorMsg = 'Camera requires HTTPS or localhost.';
+                }
+                
+                results.innerHTML = `
+                    <div class="test-result fail">
+                        <strong>✗</strong>
+                        ${errorMsg}
+                    </div>
+                `;
+                
+                log(`Camera test failed: ${err.name} - ${err.message}`, 'error');
+            }
+        }
+        
+        // Stop camera
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+                video.srcObject = null;
+                video.classList.remove('active');
+                
+                document.getElementById('camera-status').className = 'status info';
+                document.getElementById('camera-status').textContent = 'Stopped';
+                
+                log('Camera stopped', 'info');
+            } else {
+                log('No active camera stream to stop', 'warning');
+            }
+        }
+        
+        // Run all tests
+        function runAllTests() {
+            log('=== Starting all tests ===', 'info');
+            displayBrowserInfo();
+            testAPISupport();
+            setTimeout(() => {
+                testCamera();
+            }, 500);
+        }
+        
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Camera diagnostic page loaded', 'success');
+            displayBrowserInfo();
+            testAPISupport();
+        });
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>

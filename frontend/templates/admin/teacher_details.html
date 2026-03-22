@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+
+{% block title %}Teacher Details - {{ teacher.username }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Teacher Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="fw-bold"><i class="fas fa-chalkboard-teacher me-2"></i>Teacher Details</h1>
+      <p class="text-muted">{{ teacher.username }} - Attendance Records</p>
+    </div>
+    <div>
+      <a href="{{ url_for('admin_teachers') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Teachers
+      </a>
+    </div>
+  </div>
+
+  <!-- Teacher Info Card -->
+  <div class="card mb-4 animated">
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h3 class="mb-2"><i class="fas fa-user-circle me-2"></i>{{ teacher.username }}</h3>
+          <p class="mb-1"><i class="fas fa-envelope me-2"></i>{{ teacher.email }}</p>
+          <p class="mb-1"><i class="fas fa-calendar me-2"></i>Joined: {{ teacher.created_at.strftime('%B %d, %Y') }}</p>
+          <p class="mb-0">
+            <i class="fas fa-check-circle me-2"></i>
+            Status: 
+            {% if teacher.is_active %}
+              <span class="badge bg-success">Active</span>
+            {% else %}
+              <span class="badge bg-danger">Inactive</span>
+            {% endif %}
+          </p>
+        </div>
+        <div class="col-md-4 text-end">
+          <a href="{{ url_for('admin_edit_teacher', teacher_id=teacher.id) }}" class="btn btn-warning">
+            <i class="fas fa-edit me-2"></i>Edit Details
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="row g-4 mb-4">
+    <div class="col-md-4">
+      <div class="card stat-card primary animated">
+        <div class="card-body text-center">
+          <i class="fas fa-clipboard-check"></i>
+          <h3>{{ total_marked }}</h3>
+          <p>Total Attendance Marked</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card success animated">
+        <div class="card-body text-center">
+          <i class="fas fa-clock"></i>
+          <h3>{{ today_marked }}</h3>
+          <p>Marked Today</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card info animated">
+        <div class="card-body text-center">
+          <i class="fas fa-calendar-alt"></i>
+          <h3>{{ last_30_days }}</h3>
+          <p>Last 30 Days</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Students Marked By This Teacher -->
+  <div class="card mb-4 animated">
+    <div class="card-header bg-primary text-white">
+      <i class="fas fa-users me-2"></i>Students Marked by {{ teacher.username }}
+    </div>
+    <div class="card-body">
+      {% if students_marked %}
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student Name</th>
+              <th>Roll Number</th>
+              <th>Times Marked</th>
+              <th>Percentage</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set total_students = students_marked|length %}
+            {% for student_stat in students_marked %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td><strong>{{ student_stat.name }}</strong></td>
+              <td>{{ student_stat.roll }}</td>
+              <td>
+                <span class="badge bg-primary">
+                  <i class="fas fa-check me-1"></i>{{ student_stat.count }} times
+                </span>
+              </td>
+              <td>
+                {% set percentage = (student_stat.count / total_marked * 100)|round(1) %}
+                <span class="badge {% if percentage >= 10 %}bg-success{% elif percentage >= 5 %}bg-warning{% else %}bg-info{% endif %}">
+                  {{ percentage }}%
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-4">
+        <i class="fas fa-user-slash fa-3x mb-3"></i>
+        <p>No students marked by this teacher yet.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent Attendance Records -->
+  <div class="card animated">
+    <div class="card-header bg-success text-white">
+      <i class="fas fa-history me-2"></i>Recent Attendance Records (Last 50)
+    </div>
+    <div class="card-body">
+      {% if attendance_records %}
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student</th>
+              <th>Roll Number</th>
+              <th>UID</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Day</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in attendance_records[:50] %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td><strong>{{ record.student.name if record.student else 'Unknown' }}</strong></td>
+              <td>{{ record.student.roll if record.student else 'N/A' }}</td>
+              <td>
+                <code class="font-monospace small">
+                  {{ record.student.uid[:8] + '...' if record.student and record.student.uid else 'N/A' }}
+                </code>
+              </td>
+              <td>{{ record.timestamp.strftime('%Y-%m-%d') }}</td>
+              <td>
+                <span class="badge bg-primary">
+                  <i class="fas fa-clock me-1"></i>{{ record.timestamp.strftime('%H:%M') }}
+                </span>
+              </td>
+              <td>{{ record.timestamp.strftime('%A') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      
+      {% if attendance_records|length > 50 %}
+      <div class="alert alert-info mt-3">
+        <i class="fas fa-info-circle me-2"></i>
+        Showing first 50 records out of {{ attendance_records|length }} total records.
+      </div>
+      {% endif %}
+      
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="fas fa-calendar-times fa-4x mb-3"></i>
+        <h4>No attendance records yet</h4>
+        <p>This teacher hasn't marked any attendance.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
