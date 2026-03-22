@@ -4,7 +4,7 @@ services:
     env: docker
     region: oregon
     plan: free
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
       - key: FLASK_ENV
