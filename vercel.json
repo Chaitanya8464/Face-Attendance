@@ -12,7 +12,7 @@
   "routes": [
     {
       "src": "/static/(.*)",
-      "dest": "api/index.py"
+      "dest": "public/static/$1"
     },
     {
       "src": "/(.*)",
@@ -21,6 +21,6 @@
   ],
   "env": {
     "FLASK_ENV": "production",
-    "SECRET_KEY": "change-this-in-vercel-dashboard"
+    "VERCEL": "1"
   }
 }
