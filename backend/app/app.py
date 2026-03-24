@@ -33,7 +33,7 @@ from email_utils import mail, send_verification_email, send_password_reset_email
 
 app = Flask(__name__,
             template_folder=os.path.join(FRONTEND_ROOT, 'templates'),
-            static_folder=os.path.join(FRONTEND_ROOT, 'static'))
+            static_folder=os.path.join(FRONTEND_ROOT, 'templates', 'static'))
 # Changed from environment variable to direct path for Render deployment
 # TODO: Add proper config class for different environments
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(PROJECT_ROOT, 'database.db')}"
