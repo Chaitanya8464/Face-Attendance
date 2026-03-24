@@ -33,8 +33,10 @@ from email_utils import mail, send_verification_email, send_password_reset_email
 
 app = Flask(__name__,
             template_folder=os.path.join(FRONTEND_ROOT, 'templates'),
-            static_folder=os.path.join(FRONTEND_ROOT, 'templates', 'static'))
+            static_folder=os.path.join(FRONTEND_ROOT, 'templates', 'static'),
+            static_url_path='/static')
 # Changed from environment variable to direct path for Render deployment
+# For Vercel: static files are served via the serve_static() route
 # TODO: Add proper config class for different environments
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(PROJECT_ROOT, 'database.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -87,6 +89,15 @@ def health():
     """Health check endpoint for Railway"""
     # Added for Railway deployment checks
     return jsonify({'status': 'healthy'}), 200
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files from the templates/static folder"""
+    from flask import send_from_directory
+    return send_from_directory(
+        os.path.join(FRONTEND_ROOT, 'templates', 'static'),
+        filename
+    )
 
 @app.route('/')
 def index():
