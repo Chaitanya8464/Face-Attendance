@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout *)",
+      "Bash(curl *)",
+      "Bash(mkdir *)",
+      "Bash(copy *)",
+      "Bash(rm *)",
+      "Bash(xcopy *)",
+      "Bash(move *)",
+      "Bash(rmdir *)"
+    ]
+  },
+  "$version": 3
+}

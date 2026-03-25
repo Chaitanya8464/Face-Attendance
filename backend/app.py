@@ -18,14 +18,9 @@ from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
 # --- Flask & Database Setup ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-PROJECT_ROOT = os.path.dirname(BASE_DIR)  # Go up one level from backend/app to backend
-FRONTEND_ROOT = os.path.join(PROJECT_ROOT, '..', 'frontend')  # frontend is at same level as backend
+FRONTEND_ROOT = os.path.join(BASE_DIR, '..', 'frontend')  # frontend is at same level as backend
 
-# Add backend directory to path for imports
-import sys
-sys.path.insert(0, PROJECT_ROOT)
-
-# Import models and utilities (now that path is set)
+# Import models and utilities
 from models import db, Student, Attendance, User
 from face_utils import encode_faces, recognize_faces_from_frame, save_base64_image
 from auth_utils import login_manager, admin_required, teacher_required, verified_required, update_last_login
@@ -34,11 +29,19 @@ from email_utils import mail, send_verification_email, send_password_reset_email
 app = Flask(__name__,
             template_folder=FRONTEND_ROOT,
             static_folder=os.path.join(FRONTEND_ROOT, 'static'))
-# Changed from environment variable to direct path for Render deployment
-# TODO: Add proper config class for different environments
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(PROJECT_ROOT, 'database.db')}"
+
+# Database configuration - use PostgreSQL on Render, SQLite for local development
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    # Render PostgreSQL - replace postgres:// with postgresql:// for SQLAlchemy
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://')
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+else:
+    # Local development with SQLite
+    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(BASE_DIR, 'database.db')}"
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-prod')  # Added for session support
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-prod')
 
 # Email configuration (for password reset and verification)
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
