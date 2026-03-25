@@ -8,7 +8,8 @@
       "Bash(rm *)",
       "Bash(xcopy *)",
       "Bash(move *)",
-      "Bash(rmdir *)"
+      "Bash(rmdir *)",
+      "Bash(dir *)"
     ]
   },
   "$version": 3
