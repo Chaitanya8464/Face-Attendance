@@ -32,7 +32,7 @@ from auth_utils import login_manager, admin_required, teacher_required, verified
 from email_utils import mail, send_verification_email, send_password_reset_email, send_welcome_email
 
 app = Flask(__name__,
-            template_folder=os.path.join(FRONTEND_ROOT, 'templates'),
+            template_folder=FRONTEND_ROOT,
             static_folder=os.path.join(FRONTEND_ROOT, 'static'))
 # Changed from environment variable to direct path for Render deployment
 # TODO: Add proper config class for different environments
@@ -116,7 +116,7 @@ def student_login():
         remember = request.form.get('remember', False)
 
         if not (uid and password):
-            return render_template('auth/student_login.html', error='UID and password required')
+            return render_template('student_login.html', error='UID and password required')
 
         # Find student by UID
         student = Student.query.filter_by(uid=uid).first()
@@ -129,13 +129,13 @@ def student_login():
             if user and user.is_student():
                 login_user(user, remember=remember)
                 flash(f'Welcome back, {student.name}!', 'success')
-                
+
                 # Check if first login - force password change
                 if student.first_login:
                     session['pending_student_id'] = student.id
                     flash('Please change your password to continue.', 'warning')
                     return redirect(url_for('student_change_password'))
-                
+
                 return redirect(url_for('dashboard'))
             else:
                 # Student doesn't have a user account, create temporary session
@@ -143,18 +143,18 @@ def student_login():
                 session['student_id'] = student.id
                 session['student_name'] = student.name
                 session['student_roll'] = student.roll
-                
+
                 # Check if first login - force password change
                 if student.first_login:
                     flash('Please change your temporary password to continue.', 'warning')
                     return redirect(url_for('student_change_password'))
-                
+
                 flash(f'Welcome, {student.name}!', 'success')
                 return redirect(url_for('student_dashboard'))
         else:
-            return render_template('auth/student_login.html', error='Invalid UID or password')
+            return render_template('student_login.html', error='Invalid UID or password')
 
-    return render_template('auth/student_login.html')
+    return render_template('student_login.html')
 
 
 @app.route('/student-dashboard')
@@ -193,7 +193,7 @@ def student_dashboard():
     attendance_percentage = (total_attendance_days / days_in_period * 100) if days_in_period > 0 else 0
     attendance_percentage = min(100, attendance_percentage)
 
-    return render_template('student/dashboard.html',
+    return render_template('dashboard_student.html',
                          student=student,
                          attendance=attendance_records,
                          total_attendance=total_attendance,
@@ -251,7 +251,7 @@ def student_attendance_history():
     attendance_percentage = (total_attendance_days / days_in_period * 100) if days_in_period > 0 else 0
     attendance_percentage = min(100, attendance_percentage)
 
-    return render_template('student/attendance_history.html',
+    return render_template('attendance_history.html',
                          student=student,
                          attendance=attendance_records,
                          total_attendance=total_attendance,
@@ -285,17 +285,17 @@ def student_change_password():
 
         # Validate current password
         if not student.check_password(current_password):
-            return render_template('student/change_password.html', student=student, error='Current password is incorrect')
+            return render_template('change_password.html', student=student, error='Current password is incorrect')
 
         # Validate new password
         if not new_password:
-            return render_template('student/change_password.html', student=student, error='New password is required')
+            return render_template('change_password.html', student=student, error='New password is required')
 
         if len(new_password) < 6:
-            return render_template('student/change_password.html', student=student, error='Password must be at least 6 characters')
+            return render_template('change_password.html', student=student, error='Password must be at least 6 characters')
 
         if new_password != confirm_password:
-            return render_template('student/change_password.html', student=student, error='Passwords do not match')
+            return render_template('change_password.html', student=student, error='Passwords do not match')
 
         # Update password
         student.set_password(new_password)
@@ -306,7 +306,7 @@ def student_change_password():
         flash('Password changed successfully!', 'success')
         return redirect(url_for('student_dashboard'))
 
-    return render_template('student/change_password.html', student=student)
+    return render_template('change_password.html', student=student)
 
 
 @app.route('/student/forgot-password', methods=['GET', 'POST'])
@@ -317,7 +317,7 @@ def student_forgot_password():
         email = request.form.get('email', '').strip()
 
         if not (uid and email):
-            return render_template('student/forgot_password.html', error='UID and email are required')
+            return render_template('forgot_password.html', error='UID and email are required')
 
         # Find student by UID and email
         student = Student.query.filter_by(uid=uid, email=email).first()
@@ -327,7 +327,7 @@ def student_forgot_password():
             from itsdangerous import URLSafeTimedSerializer
             serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
             token = serializer.dumps(uid, salt='student-password-reset')
-            
+
             # Send reset email
             try:
                 from email_utils import send_student_password_reset_email
@@ -343,7 +343,7 @@ def student_forgot_password():
 
         return redirect(url_for('student_login'))
 
-    return render_template('student/forgot_password.html')
+    return render_template('forgot_password.html')
 
 
 @app.route('/student/reset-password/<token>', methods=['GET', 'POST'])
@@ -366,24 +366,24 @@ def student_reset_password(token):
             confirm_password = request.form.get('confirm_password', '')
             
             if not new_password:
-                return render_template('student/reset_password.html', token=token, error='Password is required')
-            
+                return render_template('reset_password.html', token=token, error='Password is required')
+
             if len(new_password) < 6:
-                return render_template('student/reset_password.html', token=token, error='Password must be at least 6 characters')
-            
+                return render_template('reset_password.html', token=token, error='Password must be at least 6 characters')
+
             if new_password != confirm_password:
-                return render_template('student/reset_password.html', token=token, error='Passwords do not match')
-            
+                return render_template('reset_password.html', token=token, error='Passwords do not match')
+
             # Update password
             student.set_password(new_password)
             student.first_login = False
             student.password_changed_at = datetime.utcnow()
             db.session.commit()
-            
+
             flash('Password reset successfully! Please log in.', 'success')
             return redirect(url_for('student_login'))
-        
-        return render_template('student/reset_password.html', token=token, student=student)
+
+        return render_template('reset_password.html', token=token, student=student)
         
     except SignatureExpired:
         flash('Reset link has expired. Please request a new one.', 'error')
@@ -413,7 +413,7 @@ def student_profile():
         email = request.form.get('email', '').strip()
 
         if not name:
-            return render_template('student/profile.html', student=student, error='Name is required')
+            return render_template('profile.html', student=student, error='Name is required')
 
         # Update student details
         student.name = name
@@ -421,18 +421,18 @@ def student_profile():
             # Check if email is already taken by another student
             existing = Student.query.filter_by(email=email).first()
             if existing and existing.id != student.id:
-                return render_template('student/profile.html', student=student, error='Email already registered')
+                return render_template('profile.html', student=student, error='Email already registered')
             student.email = email
 
         db.session.commit()
-        
+
         # Update session
         session['student_name'] = name
-        
+
         flash('Profile updated successfully!', 'success')
         return redirect(url_for('student_profile'))
 
-    return render_template('student/profile.html', student=student)
+    return render_template('profile.html', student=student)
 
 
 # ========================================
@@ -454,24 +454,24 @@ def login():
         remember = request.form.get('remember', False)
         
         if not (email and password):
-            return render_template('auth/login.html', error='Email and password required')
-        
+            return render_template('login.html', error='Email and password required')
+
         user = User.query.filter_by(email=email).first()
-        
+
         if user and user.check_password(password):
             if not user.is_active:
-                return render_template('auth/login.html', error='Account is deactivated')
-            
+                return render_template('login.html', error='Account is deactivated')
+
             login_user(user, remember=remember)
             update_last_login(user)
-            
+
             next_page = request.args.get('next')
             flash(f'Welcome back, {user.username}!', 'success')
             return redirect(next_page if next_page else url_for('dashboard'))
         else:
-            return render_template('auth/login.html', error='Invalid email or password')
-    
-    return render_template('auth/login.html')
+            return render_template('login.html', error='Invalid email or password')
+
+    return render_template('login.html')
 
 
 @app.route('/logout')
@@ -499,8 +499,8 @@ def verify_email():
         flash('Verification email sent! Please check your inbox.', 'info')
     except:
         flash('Could not send verification email. Please try again later.', 'error')
-    
-    return render_template('auth/verify_email.html')
+
+    return render_template('verify_email.html')
 
 
 @app.route('/verify-email/<token>')
@@ -539,10 +539,10 @@ def forgot_password():
         email = request.form.get('email', '').strip()
         
         if not email:
-            return render_template('auth/forgot_password.html', error='Email is required')
-        
+            return render_template('forgot_password.html', error='Email is required')
+
         user = User.query.filter_by(email=email).first()
-        
+
         if user:
             try:
                 send_password_reset_email(user)
@@ -553,10 +553,10 @@ def forgot_password():
         else:
             # Don't reveal if email exists or not (security)
             flash('If the email exists, a reset link has been sent.', 'info')
-        
+
         return redirect(url_for('login'))
-    
-    return render_template('auth/forgot_password.html')
+
+    return render_template('forgot_password.html')
 
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
@@ -573,23 +573,23 @@ def reset_password(token):
         confirm_password = request.form.get('confirm_password', '')
         
         if not password:
-            return render_template('auth/reset_password.html', error='Password is required', token=token)
-        
+            return render_template('reset_password.html', error='Password is required', token=token)
+
         if len(password) < 6:
-            return render_template('auth/reset_password.html', error='Password must be at least 6 characters', token=token)
-        
+            return render_template('reset_password.html', error='Password must be at least 6 characters', token=token)
+
         if password != confirm_password:
-            return render_template('auth/reset_password.html', error='Passwords do not match', token=token)
-        
+            return render_template('reset_password.html', error='Passwords do not match', token=token)
+
         user.set_password(password)
         user.reset_token = None
         user.reset_token_expiry = None
         db.session.commit()
-        
+
         flash('Password reset successfully! Please log in.', 'success')
         return redirect(url_for('login'))
-    
-    return render_template('auth/reset_password.html', token=token, username=user.username)
+
+    return render_template('reset_password.html', token=token, username=user.username)
 
 
 # ========================================
@@ -701,7 +701,7 @@ def show_credentials():
     if not credentials:
         return redirect(url_for('admin_students'))
 
-    return render_template('admin/credentials.html', credentials=credentials)
+    return render_template('credentials.html', credentials=credentials)
 
 
 # -----------------------
@@ -1148,7 +1148,7 @@ def attendance_students():
             'marked_by_name': today_attendance.marked_by_name if today_attendance else None
         })
     
-    return render_template('teacher/attendance_students.html',
+    return render_template('attendance_students.html',
                          student_attendance=student_attendance,
                          search_query=search,
                          total_students=len(students),
@@ -1172,7 +1172,7 @@ def admin_students():
     if os.path.exists(dataset_dir):
         files = os.listdir(dataset_dir)
 
-    return render_template('admin/students.html', students=students, files=files)
+    return render_template('students.html', students=students, files=files)
 
 
 # ========================================
@@ -1215,18 +1215,18 @@ def admin_add_teacher():
         
         # Validation
         if not username:
-            return render_template('admin/add_teacher.html', error='Username is required')
-        
+            return render_template('add_teacher.html', error='Username is required')
+
         if not email:
-            return render_template('admin/add_teacher.html', error='Email is required')
-        
+            return render_template('add_teacher.html', error='Email is required')
+
         # Check if username exists
         if User.query.filter_by(username=username).first():
-            return render_template('admin/add_teacher.html', error='Username already taken')
-        
+            return render_template('add_teacher.html', error='Username already taken')
+
         # Check if email exists
         if User.query.filter_by(email=email).first():
-            return render_template('admin/add_teacher.html', error='Email already registered')
+            return render_template('add_teacher.html', error='Email already registered')
         
         # Generate teacher ID and password
         teacher_id = generate_teacher_id()
@@ -1256,8 +1256,8 @@ def admin_add_teacher():
             'password': password
         }
         return redirect(url_for('admin_show_teacher_credentials'))
-    
-    return render_template('admin/add_teacher.html')
+
+    return render_template('add_teacher.html')
 
 
 @app.route('/admin/teachers/credentials')
@@ -1268,7 +1268,7 @@ def admin_show_teacher_credentials():
     if not credentials:
         return redirect(url_for('admin_teachers'))
 
-    return render_template('admin/teacher_credentials.html', credentials=credentials)
+    return render_template('teacher_credentials.html', credentials=credentials)
 
 
 @app.route('/admin/teachers')
@@ -1296,7 +1296,7 @@ def admin_teachers():
             'recent_marked': recent_marked
         })
     
-    return render_template('admin/teachers.html', teacher_stats=teacher_stats)
+    return render_template('teachers.html', teacher_stats=teacher_stats)
 
 
 @app.route('/admin/teachers/<int:teacher_id>/details')
@@ -1339,7 +1339,7 @@ def admin_teacher_details(teacher_id):
      .order_by(db.func.count(Attendance.id).desc())\
      .all()
     
-    return render_template('admin/teacher_details.html',
+    return render_template('teacher_details.html',
                          teacher=teacher,
                          attendance_records=attendance_records,
                          total_marked=total_marked,
@@ -1365,13 +1365,13 @@ def admin_edit_teacher(teacher_id):
         
         if not username:
             flash('Username is required.', 'error')
-            return render_template('admin/edit_teacher.html', teacher=teacher)
-        
+            return render_template('edit_teacher.html', teacher=teacher)
+
         # Check if username is taken by another user
         existing = User.query.filter_by(username=username).first()
         if existing and existing.id != teacher.id:
             flash('Username already taken.', 'error')
-            return render_template('admin/edit_teacher.html', teacher=teacher)
+            return render_template('edit_teacher.html', teacher=teacher)
         
         # Update details
         teacher.username = username
@@ -1385,8 +1385,8 @@ def admin_edit_teacher(teacher_id):
         
         db.session.commit()
         return redirect(url_for('admin_teachers'))
-    
-    return render_template('admin/edit_teacher.html', teacher=teacher)
+
+    return render_template('edit_teacher.html', teacher=teacher)
 
 
 @app.route('/admin/teachers/<int:teacher_id>/delete', methods=['POST'])
@@ -1466,7 +1466,7 @@ def admin_delete_student_get(student_id):
 def admin_credentials():
     """Admin panel - View and export student credentials"""
     students = Student.query.order_by(Student.added_on.desc()).all()
-    return render_template('admin/credentials_list.html', students=students)
+    return render_template('credentials_list.html', students=students)
 
 
 @app.route('/admin/credentials/export')
@@ -1514,7 +1514,7 @@ def admin_export_credentials():
 def admin_users():
     """Admin panel - Manage users"""
     users = User.query.order_by(User.created_at.desc()).all()
-    return render_template('admin/users.html', users=users)
+    return render_template('users.html', users=users)
 
 
 @app.route('/admin/users/<int:user_id>/activate', methods=['POST'])

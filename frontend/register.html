@@ -1,175 +1,256 @@
-{% extends 'base.html' %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Register - Face Attendance</title>
 
-{% block title %}Register - Face Attendance{% endblock %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
 
-{% block content %}
-<div class="container py-4">
-  <div class="row justify-content-center">
-    <div class="col-lg-5">
-      <!-- Registration Card -->
-      <div class="card shadow-lg border-0 animated">
-        <div class="card-header text-center">
-          <div class="mb-2">
-            <i class="fas fa-user-plus fa-3x"></i>
-          </div>
-          <h4 class="mb-0">Register New Student</h4>
-          <p class="mb-0 opacity-75 small">Admin only - Unique UID will be generated</p>
-        </div>
-        
-        <div class="card-body p-4">
-          {% if error %}
-          <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-          </div>
-          {% endif %}
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
 
-          <form method="POST" id="registerForm" onsubmit="return validateForm()">
-            <div class="mb-4">
-              <label class="form-label fw-semibold">
-                <i class="fas fa-user me-2 text-primary"></i>Full Name
-              </label>
-              <div class="input-group input-group-lg">
-                <input
-                  type="text"
-                  class="form-control"
-                  name="name"
-                  id="nameInput"
-                  placeholder="Enter full name"
-                  required
-                  autocomplete="off"
-                >
-              </div>
-              <div class="form-text">Enter the complete name as it should appear on records</div>
-            </div>
-
-            <div class="mb-4">
-              <label class="form-label fw-semibold">
-                <i class="fas fa-id-card me-2 text-primary"></i>Student ID / Roll Number
-              </label>
-              <div class="input-group input-group-lg">
-                <input
-                  type="text"
-                  class="form-control"
-                  name="roll"
-                  id="rollInput"
-                  placeholder="Enter ID or roll number"
-                  required
-                  autocomplete="off"
-                  pattern="[A-Za-z0-9]+"
-                  title="Only letters and numbers allowed"
-                >
-              </div>
-              <div class="form-text">This will be used for face recognition. Use uppercase letters and numbers.</div>
-            </div>
-
-            <div class="mb-4">
-              <label class="form-label fw-semibold">
-                <i class="fas fa-envelope me-2 text-primary"></i>Email Address (Optional)
-              </label>
-              <div class="input-group input-group-lg">
-                <input
-                  type="email"
-                  class="form-control"
-                  name="email"
-                  id="emailInput"
-                  placeholder="Enter student email"
-                  autocomplete="off"
-                >
-              </div>
-              <div class="form-text">Credentials will be sent to this email (optional but recommended)</div>
-            </div>
-
-            <div class="d-grid gap-2">
-              <button type="submit" class="btn btn-primary btn-lg">
-                <i class="fas fa-arrow-right me-2"></i>Proceed to Capture
-              </button>
-              <a href="/dashboard" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="fas fa-home me-1"></i> Home
               </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/login">
+                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/student-login">
+                <i class="fas fa-user-graduate me-1"></i> Student Login
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="py-4">
+      <div class="container py-4">
+        <div class="row justify-content-center">
+          <div class="col-lg-5">
+            <!-- Registration Card -->
+            <div class="card shadow-lg border-0 animated">
+              <div class="card-header text-center">
+                <div class="mb-2">
+                  <i class="fas fa-user-plus fa-3x"></i>
+                </div>
+                <h4 class="mb-0">Register New Student</h4>
+                <p class="mb-0 opacity-75 small">Admin only - Unique UID will be generated</p>
+              </div>
+
+              <div class="card-body p-4">
+                <div id="error-message"></div>
+
+                <form method="POST" id="registerForm" onsubmit="return validateForm()">
+                  <div class="mb-4">
+                    <label class="form-label fw-semibold">
+                      <i class="fas fa-user me-2 text-primary"></i>Full Name
+                    </label>
+                    <div class="input-group input-group-lg">
+                      <input
+                        type="text"
+                        class="form-control"
+                        name="name"
+                        id="nameInput"
+                        placeholder="Enter full name"
+                        required
+                        autocomplete="off"
+                      >
+                    </div>
+                    <div class="form-text">Enter the complete name as it should appear on records</div>
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="form-label fw-semibold">
+                      <i class="fas fa-id-card me-2 text-primary"></i>Student ID / Roll Number
+                    </label>
+                    <div class="input-group input-group-lg">
+                      <input
+                        type="text"
+                        class="form-control"
+                        name="roll"
+                        id="rollInput"
+                        placeholder="Enter ID or roll number"
+                        required
+                        autocomplete="off"
+                        pattern="[A-Za-z0-9]+"
+                        title="Only letters and numbers allowed"
+                      >
+                    </div>
+                    <div class="form-text">This will be used for face recognition. Use uppercase letters and numbers.</div>
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="form-label fw-semibold">
+                      <i class="fas fa-envelope me-2 text-primary"></i>Email Address (Optional)
+                    </label>
+                    <div class="input-group input-group-lg">
+                      <input
+                        type="email"
+                        class="form-control"
+                        name="email"
+                        id="emailInput"
+                        placeholder="Enter student email"
+                        autocomplete="off"
+                      >
+                    </div>
+                    <div class="form-text">Credentials will be sent to this email (optional but recommended)</div>
+                  </div>
+
+                  <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                      <i class="fas fa-arrow-right me-2"></i>Proceed to Capture
+                    </button>
+                    <a href="/dashboard" class="btn btn-outline-secondary">
+                      <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                  </div>
+                </form>
+
+                <hr class="my-4">
+
+                <div class="text-center">
+                  <p class="text-muted mb-2 small">Tips for best results:</p>
+                  <div class="row g-2">
+                    <div class="col-4">
+                      <div class="p-2 rounded bg-light">
+                        <i class="fas fa-sun text-warning small"></i>
+                        <br><small class="text-muted" style="font-size: 10px;">Good lighting</small>
+                      </div>
+                    </div>
+                    <div class="col-4">
+                      <div class="p-2 rounded bg-light">
+                        <i class="fas fa-face-smile text-success small"></i>
+                        <br><small class="text-muted" style="font-size: 10px;">Face visible</small>
+                      </div>
+                    </div>
+                    <div class="col-4">
+                      <div class="p-2 rounded bg-light">
+                        <i class="fas fa-glasses text-info small"></i>
+                        <br><small class="text-muted" style="font-size: 10px;">Remove glasses</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </form>
 
-          <hr class="my-4">
-
-          <div class="text-center">
-            <p class="text-muted mb-2 small">Tips for best results:</p>
-            <div class="row g-2">
-              <div class="col-4">
-                <div class="p-2 rounded bg-light">
-                  <i class="fas fa-sun text-warning small"></i>
-                  <br><small class="text-muted" style="font-size: 10px;">Good lighting</small>
-                </div>
-              </div>
-              <div class="col-4">
-                <div class="p-2 rounded bg-light">
-                  <i class="fas fa-face-smile text-success small"></i>
-                  <br><small class="text-muted" style="font-size: 10px;">Face visible</small>
-                </div>
-              </div>
-              <div class="col-4">
-                <div class="p-2 rounded bg-light">
-                  <i class="fas fa-glasses text-info small"></i>
-                  <br><small class="text-muted" style="font-size: 10px;">Remove glasses</small>
-                </div>
+            <!-- Info Card -->
+            <div class="card mt-4 border-0 shadow-sm">
+              <div class="card-body">
+                <h6 class="fw-bold mb-3"><i class="fas fa-info-circle text-info me-2"></i>What happens next?</h6>
+                <ol class="mb-0 ps-3 text-muted small">
+                  <li class="mb-2">After registration, you'll be redirected to the camera page</li>
+                  <li class="mb-2">Capture 3-5 photos from different angles</li>
+                  <li class="mb-2">System will process and store face encodings</li>
+                  <li>Once trained, attendance can be marked automatically</li>
+                </ol>
               </div>
             </div>
           </div>
         </div>
       </div>
+    </main>
 
-      <!-- Info Card -->
-      <div class="card mt-4 border-0 shadow-sm">
-        <div class="card-body">
-          <h6 class="fw-bold mb-3"><i class="fas fa-info-circle text-info me-2"></i>What happens next?</h6>
-          <ol class="mb-0 ps-3 text-muted small">
-            <li class="mb-2">After registration, you'll be redirected to the camera page</li>
-            <li class="mb-2">Capture 3-5 photos from different angles</li>
-            <li class="mb-2">System will process and store face encodings</li>
-            <li>Once trained, attendance can be marked automatically</li>
-          </ol>
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">
+              <i class="fas fa-user-check me-2"></i>FaceAttendance
+            </h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking. Fast, accurate, and reliable.</p>
+          </div>
+
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect With Us</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+            <p class="mt-3 mb-0 small">© 2025 Face Attendance System. All rights reserved.</p>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-</div>
-{% endblock %}
+    </footer>
 
-{% block extra_scripts %}
-<script>
-  // Auto-format roll number to uppercase
-  document.getElementById('rollInput').addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-  });
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/main.js"></script>
+    <script>
+      // Auto-format roll number to uppercase
+      document.getElementById('rollInput').addEventListener('input', function() {
+        this.value = this.value.toUpperCase();
+      });
 
-  // Form validation
-  function validateForm() {
-    const name = document.getElementById('nameInput').value.trim();
-    const roll = document.getElementById('rollInput').value.trim();
-    
-    if (name.length < 2) {
-      showNotification('Name must be at least 2 characters', 'warning');
-      return false;
-    }
-    
-    if (roll.length < 3) {
-      showNotification('Roll number must be at least 3 characters', 'warning');
-      return false;
-    }
-    
-    showNotification('Registering student...', 'info');
-    return true;
-  }
+      // Form validation
+      function validateForm() {
+        const name = document.getElementById('nameInput').value.trim();
+        const roll = document.getElementById('rollInput').value.trim();
 
-  // Add animation on scroll
-  document.querySelectorAll('.card').forEach((card, index) => {
-    card.style.opacity = '0';
-    card.style.transform = 'translateY(20px)';
-    setTimeout(() => {
-      card.style.transition = 'all 0.5s ease';
-      card.style.opacity = '1';
-      card.style.transform = 'translateY(0)';
-    }, index * 100);
-  });
-</script>
-{% endblock %}
+        if (name.length < 2) {
+          showNotification('Name must be at least 2 characters', 'warning');
+          return false;
+        }
+
+        if (roll.length < 3) {
+          showNotification('Roll number must be at least 3 characters', 'warning');
+          return false;
+        }
+
+        showNotification('Registering student...', 'info');
+        return true;
+      }
+
+      // Add animation on scroll
+      document.querySelectorAll('.card').forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+          card.style.transition = 'all 0.5s ease';
+          card.style.opacity = '1';
+          card.style.transform = 'translateY(0)';
+        }, index * 100);
+      });
+    </script>
+  </body>
+</html>

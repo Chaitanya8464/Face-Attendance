@@ -1,22 +1,79 @@
-{% extends 'base.html' %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Student Attendance - Face Attendance System</title>
 
-{% block title %}Student Attendance - Face Attendance System{% endblock %}
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-{% block content %}
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="fas fa-home me-1"></i> Home
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/login">
+                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/student-login">
+                <i class="fas fa-user-graduate me-1"></i> Student Login
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3" id="flash-messages">
+      <!-- Flash messages will be inserted here by JS if needed -->
+    </div>
+
+    <!-- Main Content -->
+    <main class="py-4">
 <div class="container py-4">
   <!-- Header with Search -->
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
       <h1 class="fw-bold"><i class="fas fa-chart-pie me-2"></i>Student Attendance</h1>
       <p class="text-muted">View attendance percentage and search by UID</p>
-      {% if not is_admin %}
       <p class="small text-muted mt-1">
-        <i class="fas fa-info-circle me-1"></i>Showing attendance marked by <strong>{{ current_user.username }}</strong> only
+        <i class="fas fa-info-circle me-1"></i>Showing attendance marked by current user only
       </p>
-      {% endif %}
     </div>
     <div>
-      <a href="{{ url_for('attendance_page') }}" class="btn btn-primary">
+      <a href="/attendance" class="btn btn-primary">
         <i class="fas fa-camera me-2"></i>Mark Attendance
       </a>
     </div>
@@ -25,15 +82,15 @@
   <!-- Search Bar -->
   <div class="card mb-4 animated">
     <div class="card-body">
-      <form method="GET" action="{{ url_for('attendance_students') }}" class="row g-3">
+      <form method="GET" action="/attendance-students" class="row g-3">
         <div class="col-md-9">
           <div class="input-group">
             <span class="input-group-text">
               <i class="fas fa-search"></i>
             </span>
-            <input type="text" class="form-control" name="search" 
-                   placeholder="Search by Student Name, Roll Number, or UID..." 
-                   value="{{ search_query }}">
+            <input type="text" class="form-control" name="search"
+                   placeholder="Search by Student Name, Roll Number, or UID..."
+                   value="">
           </div>
         </div>
         <div class="col-md-3">
@@ -41,11 +98,9 @@
             <button type="submit" class="btn btn-primary flex-fill">
               <i class="fas fa-search me-1"></i>Search
             </button>
-            {% if search_query %}
-            <a href="{{ url_for('attendance_students') }}" class="btn btn-outline-secondary">
+            <a href="/attendance-students" class="btn btn-outline-secondary">
               <i class="fas fa-times"></i>
             </a>
-            {% endif %}
           </div>
         </div>
       </form>
@@ -58,7 +113,7 @@
       <div class="card stat-card primary animated">
         <div class="card-body text-center">
           <i class="fas fa-users"></i>
-          <h3>{{ total_students }}</h3>
+          <h3>0</h3>
           <p>Total Students</p>
         </div>
       </div>
@@ -67,8 +122,8 @@
       <div class="card stat-card success animated">
         <div class="card-body text-center">
           <i class="fas fa-check-circle"></i>
-          <h3>{{ student_attendance|selectattr('marked_today')|list|length }}</h3>
-          <p>Present Today{% if not is_admin %} (Your Marks){% endif %}</p>
+          <h3>0</h3>
+          <p>Present Today</p>
         </div>
       </div>
     </div>
@@ -76,8 +131,8 @@
       <div class="card stat-card info animated">
         <div class="card-body text-center">
           <i class="fas fa-user-slash"></i>
-          <h3>{{ student_attendance|rejectattr('marked_today')|list|length }}</h3>
-          <p>Absent Today{% if not is_admin %} (Not Marked by You){% endif %}</p>
+          <h3>0</h3>
+          <p>Absent Today</p>
         </div>
       </div>
     </div>
@@ -87,7 +142,7 @@
   <div class="card animated">
     <div class="card-header d-flex justify-content-between align-items-center">
       <span><i class="fas fa-list me-2"></i>Attendance Overview</span>
-      <span class="badge bg-primary">{{ total_students }} Students</span>
+      <span class="badge bg-primary">0 Students</span>
     </div>
     <div class="card-body">
       <div class="table-responsive">
@@ -101,115 +156,25 @@
               <th>Total Attendance</th>
               <th>Attendance %</th>
               <th>Present Today</th>
-              {% if is_admin %}
               <th>Marked By</th>
-              {% endif %}
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {% for data in student_attendance %}
-            {% set student = data.student %}
             <tr>
-              <td>{{ loop.index }}</td>
-              <td><strong>{{ student.name }}</strong></td>
-              <td>{{ student.roll }}</td>
-              <td>
-                <code class="font-monospace small">{{ student.uid[:8] }}...</code>
-              </td>
-              <td>
-                <span class="badge bg-info">
-                  <i class="fas fa-calendar-check me-1"></i>{{ data.total_attendance }} days
-                </span>
-              </td>
-              <td>
-                {% set percentage = data.attendance_percentage %}
-                {% if percentage >= 75 %}
-                  <span class="badge bg-success">
-                    <i class="fas fa-chart-line me-1"></i>{{ percentage }}%
-                  </span>
-                {% elif percentage >= 50 %}
-                  <span class="badge bg-warning">
-                    <i class="fas fa-chart-bar me-1"></i>{{ percentage }}%
-                  </span>
-                {% else %}
-                  <span class="badge bg-danger">
-                    <i class="fas fa-chart-line me-1"></i>{{ percentage }}%
-                  </span>
-                {% endif %}
-              </td>
-              <td>
-                {% if data.marked_today %}
-                  <span class="badge bg-success">
-                    <i class="fas fa-check me-1"></i>Present
-                  </span>
-                {% else %}
-                  <span class="badge bg-secondary">
-                    <i class="fas fa-times me-1"></i>Absent
-                  </span>
-                {% endif %}
-              </td>
-              {% if is_admin %}
-              <td>
-                {% if data.marked_today %}
-                  {% if data.marked_by_name %}
-                    <span class="badge bg-primary">
-                      <i class="fas fa-user-check me-1"></i>{{ data.marked_by_name }}
-                    </span>
-                  {% else %}
-                    <span class="badge bg-info">
-                      <i class="fas fa-user me-1"></i>Self
-                    </span>
-                  {% endif %}
-                {% else %}
-                  <span class="text-muted">-</span>
-                {% endif %}
-              </td>
-              {% endif %}
-              <td>
-                <div class="btn-group btn-group-sm">
-                  <a href="{{ url_for('admin_students') }}" class="btn btn-outline-primary" 
-                     title="View Details">
-                    <i class="fas fa-eye"></i>
-                  </a>
-                  <button type="button" class="btn btn-outline-info" 
-                          onclick="showAttendanceDetails('{{ student.name }}', {{ data.total_attendance }}, {{ data.attendance_percentage }})"
-                          title="View Stats">
-                    <i class="fas fa-chart-bar"></i>
-                  </button>
-                </div>
+              <td colspan="9" class="text-center text-muted py-4">
+                <i class="fas fa-clipboard-list fa-3x mb-3"></i>
+                <h5>No Attendance Records Yet</h5>
+                <p class="mb-3">You haven't marked attendance for any students yet.</p>
+                <a href="/attendance" class="btn btn-primary">
+                  <i class="fas fa-camera me-2"></i>Mark Attendance Now
+                </a>
+                <p class="mt-3 small text-muted">
+                  <i class="fas fa-info-circle me-1"></i>
+                  Once you mark attendance, students will appear here.
+                </p>
               </td>
             </tr>
-            {% else %}
-            <tr>
-              <td colspan="{% if is_admin %}9{% else %}8{% endif %}" class="text-center text-muted py-4">
-                {% if search_query %}
-                  <i class="fas fa-search fa-3x mb-3"></i>
-                  <p>No students found matching "<strong>{{ search_query }}</strong>"</p>
-                  <a href="{{ url_for('attendance_students') }}" class="btn btn-primary">
-                    <i class="fas fa-times me-2"></i>Clear Search
-                  </a>
-                {% elif not is_admin %}
-                  <i class="fas fa-clipboard-list fa-3x mb-3"></i>
-                  <h5>No Attendance Records Yet</h5>
-                  <p class="mb-3">You haven't marked attendance for any students yet.</p>
-                  <a href="{{ url_for('attendance_page') }}" class="btn btn-primary">
-                    <i class="fas fa-camera me-2"></i>Mark Attendance Now
-                  </a>
-                  <p class="mt-3 small text-muted">
-                    <i class="fas fa-info-circle me-1"></i>
-                    Once you mark attendance, students will appear here.
-                  </p>
-                {% else %}
-                  <i class="fas fa-user-slash fa-3x mb-3"></i>
-                  <p>No students registered yet.</p>
-                  <a href="{{ url_for('register') }}" class="btn btn-primary">
-                    <i class="fas fa-user-plus me-2"></i>Register First Student
-                  </a>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
           </tbody>
         </table>
       </div>
@@ -296,8 +261,51 @@ function showAttendanceDetails(name, total, percentage) {
   document.getElementById('studentName').textContent = name;
   document.getElementById('totalAttendance').textContent = total;
   document.getElementById('attendancePercentage').textContent = percentage + '%';
-  
+
   new bootstrap.Modal(document.getElementById('attendanceModal')).show();
 }
 </script>
-{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">
+              <i class="fas fa-user-check me-2"></i>FaceAttendance
+            </h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking. Fast, accurate, and reliable.</p>
+          </div>
+
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect With Us</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+            <p class="mt-3 mb-0 small">© 2025 Face Attendance System. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+  </body>
+</html>

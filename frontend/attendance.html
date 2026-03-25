@@ -1,8 +1,74 @@
-{% extends 'base.html' %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mark Attendance - Face Attendance</title>
 
-{% block title %}Mark Attendance - Face Attendance{% endblock %}
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-{% block content %}
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+
+    <style>
+    @keyframes scan {
+      0% { top: 0%; }
+      100% { top: 100%; }
+    }
+    </style>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="fas fa-home me-1"></i> Home
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/login">
+                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/student-login">
+                <i class="fas fa-user-graduate me-1"></i> Student Login
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3" id="flash-messages">
+      <!-- Flash messages will be inserted here by JS if needed -->
+    </div>
+
+    <!-- Main Content -->
+    <main class="py-4">
 <div class="container py-4">
   <div class="row justify-content-center">
     <div class="col-12">
@@ -25,12 +91,12 @@
                 <i class="fas fa-circle me-1 small"></i>Ready
               </span>
             </div>
-            
+
             <div class="card-body p-0">
               <div class="video-container position-relative">
                 <video id="attendanceVideo" autoplay playsinline class="w-100" style="min-height: 400px;"></video>
                 <div class="camera-frame"></div>
-                
+
                 <!-- Scanning animation overlay -->
                 <div id="scan-overlay" class="position-absolute top-0 start-0 w-100 h-100 d-none">
                   <div style="
@@ -43,7 +109,7 @@
                   "></div>
                 </div>
               </div>
-              
+
               <div class="card-body">
                 <div class="d-grid gap-2 d-md-flex justify-content-md-center">
                   <button id="startAttendance" class="btn btn-success btn-lg px-5">
@@ -53,7 +119,7 @@
                     <i class="fas fa-stop me-2"></i>Stop Recognition
                   </button>
                 </div>
-                
+
                 <div class="text-center mt-3">
                   <div id="status-indicator" class="spinner-border text-success d-none" role="status">
                     <span class="visually-hidden">Loading...</span>
@@ -63,7 +129,7 @@
               </div>
             </div>
           </div>
-          
+
           <!-- Info Card -->
           <div class="card mt-3 border-0 shadow-sm animated">
             <div class="card-body p-3">
@@ -84,25 +150,25 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Results Section -->
         <div class="col-lg-4">
           <div class="card shadow-lg border-0 animated" style="animation-delay: 0.1s;">
             <div class="card-header">
               <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Detected Students</h5>
             </div>
-            
+
             <div class="card-body">
               <div class="text-center py-4" id="no-results">
                 <i class="fas fa-user-slash fa-3x text-muted mb-3 opacity-50"></i>
                 <p class="text-muted mb-0">No students detected yet.<br>Start recognition to begin.</p>
               </div>
-              
+
               <div id="detected-list" class="list-group list-group-flush">
                 <!-- Detected students will appear here -->
               </div>
             </div>
-            
+
             <div class="card-footer bg-light">
               <div class="d-flex justify-content-between align-items-center small">
                 <span class="text-muted">Session Total:</span>
@@ -110,7 +176,7 @@
               </div>
             </div>
           </div>
-          
+
           <!-- Today's Stats -->
           <div class="card mt-3 border-0 shadow-sm animated" style="animation-delay: 0.2s;">
             <div class="card-header bg-info text-white">
@@ -134,23 +200,56 @@
     </div>
   </div>
 </div>
+    </main>
 
-<style>
-@keyframes scan {
-  0% { top: 0%; }
-  100% { top: 100%; }
-}
-</style>
-{% endblock %}
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">
+              <i class="fas fa-user-check me-2"></i>FaceAttendance
+            </h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking. Fast, accurate, and reliable.</p>
+          </div>
 
-{% block extra_scripts %}
-<script>
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect With Us</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+            <p class="mt-3 mb-0 small">© 2025 Face Attendance System. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+
+    <script>
   let video = document.getElementById('attendanceVideo');
   let stream = null;
   let recognitionInterval = null;
   let detectedStudents = new Set();
   let sessionCount = 0;
-  
+
   // Initialize camera
   async function initCamera() {
     try {
@@ -182,9 +281,9 @@
       console.error('Camera error:', err);
       console.error('Error name:', err.name);
       console.error('Error message:', err.message);
-      
+
       let errorMessage = 'Camera access failed. ';
-      
+
       if (err.name === 'NotAllowedError') {
         errorMessage += 'Please allow camera permission in your browser settings.';
       } else if (err.name === 'NotFoundError') {
@@ -196,18 +295,18 @@
       } else {
         errorMessage += err.message;
       }
-      
+
       showNotification(errorMessage, 'error');
       document.getElementById('camera-status').innerHTML = '<i class="fas fa-exclamation-triangle me-1 small"></i>Error';
       document.getElementById('camera-status').classList.remove('bg-success');
       document.getElementById('camera-status').classList.add('bg-danger');
-      
+
       // Disable start button
       document.getElementById('startAttendance').disabled = true;
       document.getElementById('startAttendance').title = 'Camera not available';
     }
   }
-  
+
   // Start recognition
   document.getElementById('startAttendance').onclick = async function() {
     this.classList.add('d-none');
@@ -215,32 +314,32 @@
     document.getElementById('scan-overlay').classList.remove('d-none');
     document.getElementById('status-text').textContent = 'Scanning for faces...';
     document.getElementById('status-indicator').classList.remove('d-none');
-    
+
     // Recognize every 2 seconds
     recognitionInterval = setInterval(performRecognition, 2000);
-    
+
     // First recognition immediately
     performRecognition();
   };
-  
+
   // Stop recognition
   document.getElementById('stopAttendance').onclick = function() {
     stopRecognition();
   };
-  
+
   function stopRecognition() {
     if (recognitionInterval) {
       clearInterval(recognitionInterval);
       recognitionInterval = null;
     }
-    
+
     document.getElementById('startAttendance').classList.remove('d-none');
     document.getElementById('stopAttendance').classList.add('d-none');
     document.getElementById('scan-overlay').classList.add('d-none');
     document.getElementById('status-indicator').classList.add('d-none');
     document.getElementById('status-text').textContent = 'Recognition stopped';
   }
-  
+
   // Perform face recognition
   async function performRecognition() {
     try {
@@ -250,33 +349,33 @@
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg');
-      
+
       const response = await fetch('/api/recognize_attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: dataUrl })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.error) {
         console.error('Recognition error:', data.error);
         return;
       }
-      
+
       // Update detected list
       const detectedList = document.getElementById('detected-list');
       const noResults = document.getElementById('no-results');
-      
+
       if (data.recognized && data.recognized.length > 0) {
         if (noResults) noResults.style.display = 'none';
-        
+
         data.recognized.forEach(student => {
           const key = `${student.roll}-${student.name}`;
           if (!detectedStudents.has(key)) {
             detectedStudents.add(key);
             sessionCount++;
-            
+
             const item = document.createElement('div');
             item.className = 'list-group-item d-flex justify-content-between align-items-center animated fade-in';
             item.innerHTML = `
@@ -287,12 +386,12 @@
               <span class="badge bg-success"><i class="fas fa-check me-1"></i>Marked</span>
             `;
             detectedList.appendChild(item);
-            
+
             document.getElementById('session-count').textContent = sessionCount;
-            
+
             // Show success notification
             showNotification(`${student.name} (${student.roll}) - Attendance marked!`, 'success');
-            
+
             // Trigger confetti for first detection
             if (sessionCount === 1) {
               triggerConfetti();
@@ -300,12 +399,12 @@
           }
         });
       }
-      
+
     } catch (error) {
       console.error('Recognition failed:', error);
     }
   }
-  
+
   // Load today's stats
   async function loadTodayStats() {
     try {
@@ -317,13 +416,13 @@
       console.error('Failed to load stats:', error);
     }
   }
-  
+
   // Initialize on load
   document.addEventListener('DOMContentLoaded', () => {
     initCamera();
     loadTodayStats();
   });
-  
+
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
     if (stream) {
@@ -334,4 +433,5 @@
     }
   });
 </script>
-{% endblock %}
+  </body>
+</html>
