@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(timeout *)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(mkdir *)",
+      "Bash(copy *)"
     ]
   },
   "$version": 3
