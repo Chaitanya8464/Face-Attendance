@@ -19,21 +19,7 @@ from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 # --- Flask & Database Setup ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 PROJECT_ROOT = os.path.dirname(BASE_DIR)  # Go up one level from backend/app to backend
-
-# Detect Vercel environment
-IS_VERCEL = os.environ.get('VERCEL', '0') == '1'
-
-if IS_VERCEL:
-    # Vercel serverless - use absolute paths from project root
-    FRONTEND_ROOT = os.path.join(PROJECT_ROOT, 'frontend')
-    # Static files served from public folder on Vercel
-    STATIC_FOLDER = os.path.join(PROJECT_ROOT, 'public', 'static')
-    TEMPLATE_FOLDER = os.path.join(FRONTEND_ROOT, 'templates')
-else:
-    # Local/Render - use relative paths
-    FRONTEND_ROOT = os.path.join(PROJECT_ROOT, '..', 'frontend')
-    STATIC_FOLDER = os.path.join(FRONTEND_ROOT, 'templates', 'static')
-    TEMPLATE_FOLDER = os.path.join(FRONTEND_ROOT, 'templates')
+FRONTEND_ROOT = os.path.join(PROJECT_ROOT, '..', 'frontend')  # frontend is at same level as backend
 
 # Add backend directory to path for imports
 import sys
@@ -46,11 +32,9 @@ from auth_utils import login_manager, admin_required, teacher_required, verified
 from email_utils import mail, send_verification_email, send_password_reset_email, send_welcome_email
 
 app = Flask(__name__,
-            template_folder=TEMPLATE_FOLDER,
-            static_folder=STATIC_FOLDER,
-            static_url_path='/static')
+            template_folder=os.path.join(FRONTEND_ROOT, 'templates'),
+            static_folder=os.path.join(FRONTEND_ROOT, 'static'))
 # Changed from environment variable to direct path for Render deployment
-# For Vercel: static files served from public/static via vercel.json routing
 # TODO: Add proper config class for different environments
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(PROJECT_ROOT, 'database.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -103,20 +87,6 @@ def health():
     """Health check endpoint for Railway"""
     # Added for Railway deployment checks
     return jsonify({'status': 'healthy'}), 200
-
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    """Serve static files from the templates/static or public/static folder"""
-    from flask import send_from_directory
-    
-    if IS_VERCEL:
-        # Vercel - serve from public/static
-        static_root = os.path.join(PROJECT_ROOT, 'public', 'static')
-    else:
-        # Local/Render - serve from templates/static
-        static_root = os.path.join(FRONTEND_ROOT, 'templates', 'static')
-    
-    return send_from_directory(static_root, filename)
 
 @app.route('/')
 def index():
