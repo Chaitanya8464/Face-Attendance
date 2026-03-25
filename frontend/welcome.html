@@ -19,18 +19,18 @@
       <h1>🎉 Welcome!</h1>
     </div>
     <div class="content">
-      <h2>Hello {{ username }},</h2>
+      <h2>Hello,</h2>
       <p>Welcome to <strong>Face Attendance System</strong>! Your account has been created successfully.</p>
-      
+
       <div class="info-box">
         <h3>📋 Account Details</h3>
-        <p><strong>Username:</strong> {{ username }}</p>
-        <p><strong>Role:</strong> {{ role }}</p>
+        <p><strong>Username:</strong> [Username]</p>
+        <p><strong>Role:</strong> [Role]</p>
       </div>
 
       <p>You can now log in to your account and start using the system:</p>
       <p style="text-align: center;">
-        <a href="{{ login_url }}" class="button">🚀 Go to Login</a>
+        <a href="/login" class="button">🚀 Go to Login</a>
       </p>
 
       <h3>What's Next?</h3>
@@ -38,11 +38,9 @@
         <li>✅ Verify your email address (check your inbox)</li>
         <li>✅ Complete your profile</li>
         <li>✅ Explore the dashboard</li>
-        {% if role == 'Teacher' or role == 'Admin' %}
         <li>✅ Start registering students</li>
         <li>✅ Capture face images</li>
         <li>✅ Train the recognition model</li>
-        {% endif %}
       </ul>
 
       <p>If you have any questions, feel free to reach out to our support team.</p>

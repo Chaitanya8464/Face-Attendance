@@ -1,22 +1,77 @@
-{% extends 'base.html' %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>My Dashboard - Face Attendance</title>
 
-{% block title %}My Dashboard - {{ student.name }}{% endblock %}
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-{% block content %}
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="fas fa-home me-1"></i> Home
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/login">
+                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/student-login">
+                <i class="fas fa-user-graduate me-1"></i> Student Login
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3" id="flash-messages">
+      <!-- Flash messages will be inserted here by JS if needed -->
+    </div>
+
+    <!-- Main Content -->
+    <main class="py-4">
 <div class="container py-4">
   <!-- Student Header -->
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-      <h1 class="fw-bold"><i class="fas fa-user-graduate me-2"></i>{{ student.name }}</h1>
-      <p class="text-muted">Roll: {{ student.roll }} | UID: <span class="font-monospace">{{ student.uid[:8] }}...</span></p>
+      <h1 class="fw-bold"><i class="fas fa-user-graduate me-2"></i>Student Name</h1>
+      <p class="text-muted">Roll: STU001 | UID: <span class="font-monospace">UID12345...</span></p>
     </div>
     <div>
-      <span class="badge {% if student.is_trained %}bg-success{% else %}bg-warning{% endif %} fs-6">
-        {% if student.is_trained %}
-          <i class="fas fa-check-circle me-1"></i>Face Trained
-        {% else %}
-          <i class="fas fa-clock me-1"></i>Not Trained
-        {% endif %}
+      <span class="badge bg-success fs-6">
+        <i class="fas fa-check-circle me-1"></i>Face Trained
       </span>
     </div>
   </div>
@@ -27,25 +82,25 @@
       <div class="card stat-card primary animated">
         <div class="card-body text-center">
           <i class="fas fa-calendar-check"></i>
-          <h3>{{ total_attendance }}</h3>
+          <h3>0</h3>
           <p>Total Attendance</p>
         </div>
       </div>
     </div>
     <div class="col-md-4">
-      <div class="card stat-card {% if attendance_percentage >= 75 %}success{% elif attendance_percentage >= 50 %}warning{% else %}danger{% endif %} animated">
+      <div class="card stat-card success animated">
         <div class="card-body text-center">
           <i class="fas fa-chart-pie"></i>
-          <h3>{{ attendance_percentage }}%</h3>
+          <h3>0%</h3>
           <p>Attendance %</p>
         </div>
       </div>
     </div>
     <div class="col-md-4">
-      <div class="card stat-card {% if marked_today %}success{% else %}warning{% endif %} animated">
+      <div class="card stat-card warning animated">
         <div class="card-body text-center">
           <i class="fas fa-clock"></i>
-          <h3>{% if marked_today %}Yes{% else %}No{% endif %}</h3>
+          <h3>No</h3>
           <p>Marked Today</p>
         </div>
       </div>
@@ -56,60 +111,19 @@
   <div class="card animated">
     <div class="card-header d-flex justify-content-between align-items-center">
       <span><i class="fas fa-list me-2"></i>Recent Attendance Records</span>
-      <a href="{{ url_for('student_attendance_history') }}" class="btn btn-sm btn-primary">
+      <a href="/student/attendance-history" class="btn btn-sm btn-primary">
         <i class="fas fa-history me-1"></i>View Full History
       </a>
     </div>
     <div class="card-body">
-      {% if attendance %}
-      <div class="table-responsive">
-        <table class="table table-hover">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Marked By</th>
-              <th>Day</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for record in attendance[:10] %}
-            <tr>
-              <td>{{ loop.index }}</td>
-              <td>{{ record.timestamp.strftime('%Y-%m-%d') }}</td>
-              <td>
-                <span class="badge bg-primary">
-                  {{ record.timestamp.strftime('%H:%M:%S') }}
-                </span>
-              </td>
-              <td>
-                {% if record.marked_by_name %}
-                  <span class="badge bg-primary">
-                    <i class="fas fa-user-check me-1"></i>{{ record.marked_by_name }}
-                  </span>
-                {% else %}
-                  <span class="badge bg-info">
-                    <i class="fas fa-user me-1"></i>Self
-                  </span>
-                {% endif %}
-              </td>
-              <td>{{ record.timestamp.strftime('%A') }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
       <div class="text-center text-muted py-5">
         <i class="fas fa-calendar-times fa-4x mb-3"></i>
         <h4>No attendance records yet</h4>
         <p>Mark your attendance using the face recognition system</p>
-        <a href="{{ url_for('attendance_page') }}" class="btn btn-primary">
+        <a href="/attendance" class="btn btn-primary">
           <i class="fas fa-camera me-2"></i>Mark Attendance Now
         </a>
       </div>
-      {% endif %}
     </div>
   </div>
 
@@ -120,7 +134,7 @@
         <div class="card-body">
           <h5 class="card-title"><i class="fas fa-camera me-2"></i>Mark Attendance</h5>
           <p class="card-text">Use face recognition to mark your attendance for today.</p>
-          <a href="{{ url_for('attendance_page') }}" class="btn btn-primary">
+          <a href="/attendance" class="btn btn-primary">
             <i class="fas fa-camera me-2"></i>Go to Attendance
           </a>
         </div>
@@ -131,7 +145,7 @@
         <div class="card-body">
           <h5 class="card-title"><i class="fas fa-clipboard-list me-2"></i>View History</h5>
           <p class="card-text">View your complete attendance history with details.</p>
-          <a href="{{ url_for('student_attendance_history') }}" class="btn btn-outline-primary">
+          <a href="/student/attendance-history" class="btn btn-outline-primary">
             <i class="fas fa-history me-2"></i>Full History
           </a>
         </div>
@@ -143,10 +157,10 @@
           <h5 class="card-title"><i class="fas fa-user me-2"></i>Account</h5>
           <p class="card-text">Manage your profile and account settings.</p>
           <div class="d-grid gap-2">
-            <a href="{{ url_for('student_profile') }}" class="btn btn-outline-primary">
+            <a href="/student/profile" class="btn btn-outline-primary">
               <i class="fas fa-user-edit me-2"></i>Edit Profile
             </a>
-            <a href="{{ url_for('student_change_password') }}" class="btn btn-outline-warning">
+            <a href="/student/change-password" class="btn btn-outline-warning">
               <i class="fas fa-key me-2"></i>Change Password
             </a>
           </div>
@@ -155,4 +169,47 @@
     </div>
   </div>
 </div>
-{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">
+              <i class="fas fa-user-check me-2"></i>FaceAttendance
+            </h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking. Fast, accurate, and reliable.</p>
+          </div>
+
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect With Us</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+            <p class="mt-3 mb-0 small">© 2025 Face Attendance System. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+  </body>
+</html>

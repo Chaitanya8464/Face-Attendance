@@ -1,8 +1,67 @@
-{% extends 'base.html' %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>User Management - Admin</title>
 
-{% block title %}User Management - Admin{% endblock %}
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-{% block content %}
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="fas fa-home me-1"></i> Home
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/login">
+                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/student-login">
+                <i class="fas fa-user-graduate me-1"></i> Student Login
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3" id="flash-messages">
+      <!-- Flash messages will be inserted here by JS if needed -->
+    </div>
+
+    <!-- Main Content -->
+    <main class="py-4">
 <div class="container py-4">
   <!-- Header -->
   <div class="d-flex justify-content-between align-items-center mb-4">
@@ -11,7 +70,7 @@
       <p class="text-muted">Manage all user accounts</p>
     </div>
     <div>
-      <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
+      <a href="/dashboard" class="btn btn-outline-primary">
         <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
       </a>
     </div>
@@ -35,63 +94,35 @@
             </tr>
           </thead>
           <tbody>
-            {% for user in users %}
             <tr>
-              <td>{{ user.id }}</td>
+              <td>1</td>
               <td>
-                <strong>{{ user.username }}</strong>
-                {% if user.is_admin() %}
+                <strong>admin</strong>
                 <span class="badge bg-danger ms-1">Admin</span>
-                {% endif %}
               </td>
-              <td>{{ user.email }}</td>
+              <td>admin@example.com</td>
               <td>
-                <form method="POST" action="{{ url_for('admin_change_role', user_id=user.id) }}" class="d-inline">
-                  <select name="role" class="form-select form-select-sm" onchange="this.form.submit()" {% if user.is_admin() %}disabled{% endif %}>
-                    <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
-                    <option value="teacher" {% if user.role == 'teacher' %}selected{% endif %}>Teacher</option>
-                    <option value="student" {% if user.role == 'student' %}selected{% endif %}>Student</option>
-                  </select>
-                </form>
+                <select name="role" class="form-select form-select-sm" disabled>
+                  <option value="admin" selected>Admin</option>
+                  <option value="teacher">Teacher</option>
+                  <option value="student">Student</option>
+                </select>
               </td>
               <td>
-                {% if user.is_verified %}
                 <span class="badge bg-success"><i class="fas fa-check me-1"></i>Verified</span>
-                {% else %}
-                <span class="badge bg-warning"><i class="fas fa-clock me-1"></i>Pending</span>
-                {% endif %}
               </td>
               <td>
-                {% if user.is_active %}
                 <span class="badge bg-success">Active</span>
-                {% else %}
-                <span class="badge bg-danger">Inactive</span>
-                {% endif %}
               </td>
-              <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+              <td>2025-01-01</td>
               <td>
                 <div class="btn-group btn-group-sm">
-                  <!-- Activate/Deactivate -->
-                  <form method="POST" action="{{ url_for('admin_activate_user', user_id=user.id) }}" class="d-inline">
-                    <button type="submit" class="btn {% if user.is_active %}btn-warning{% else %}btn-success{% endif %}" 
-                            title="{% if user.is_active %}Deactivate{% else %}Activate{% endif %}"
-                            {% if user.is_admin() %}disabled{% endif %}>
-                      <i class="fas fa-{% if user.is_active %}ban{% else %}check{% endif %}"></i>
-                    </button>
-                  </form>
-                  
-                  <!-- Delete -->
-                  {% if not user.is_admin() %}
-                  <button type="button" class="btn btn-danger" 
-                          onclick="confirmDelete({{ user.id }}, '{{ user.username }}')"
-                          title="Delete User">
-                    <i class="fas fa-trash"></i>
+                  <button type="submit" class="btn btn-warning" disabled title="Deactivate">
+                    <i class="fas fa-ban"></i>
                   </button>
-                  {% endif %}
                 </div>
               </td>
             </tr>
-            {% endfor %}
           </tbody>
         </table>
       </div>
@@ -128,4 +159,47 @@ function confirmDelete(userId, username) {
   new bootstrap.Modal(document.getElementById('deleteModal')).show();
 }
 </script>
-{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">
+              <i class="fas fa-user-check me-2"></i>FaceAttendance
+            </h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking. Fast, accurate, and reliable.</p>
+          </div>
+
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect With Us</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+            <p class="mt-3 mb-0 small">© 2025 Face Attendance System. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+  </body>
+</html>

@@ -1,8 +1,67 @@
-{% extends 'base.html' %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin Dashboard - Face Attendance System</title>
 
-{% block title %}Admin Dashboard - Face Attendance System{% endblock %}
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-{% block content %}
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="fas fa-home me-1"></i> Home
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/login">
+                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/student-login">
+                <i class="fas fa-user-graduate me-1"></i> Student Login
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3" id="flash-messages">
+      <!-- Flash messages will be inserted here by JS if needed -->
+    </div>
+
+    <!-- Main Content -->
+    <main class="py-4">
 <div class="container py-4">
   <!-- Admin Header -->
   <div class="d-flex justify-content-between align-items-center mb-4">
@@ -11,7 +70,7 @@
       <p class="text-muted">Manage users and system settings</p>
     </div>
     <div>
-      <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
+      <a href="/admin/users" class="btn btn-primary">
         <i class="fas fa-users-cog me-2"></i>Manage Users
       </a>
     </div>
@@ -38,7 +97,7 @@
       </div>
     </div>
     <div class="col-md-3">
-      <a href="{{ url_for('admin_teachers') }}" class="text-decoration-none">
+      <a href="/admin/teachers" class="text-decoration-none">
         <div class="card stat-card info animated" style="cursor: pointer; transition: transform 0.2s;"
              onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
           <div class="card-body text-center">
@@ -50,7 +109,7 @@
       </a>
     </div>
     <div class="col-md-3">
-      <a href="{{ url_for('admin_students') }}" class="text-decoration-none">
+      <a href="/admin/students" class="text-decoration-none">
         <div class="card stat-card warning animated" style="cursor: pointer; transition: transform 0.2s;"
              onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
           <div class="card-body text-center">
@@ -70,7 +129,7 @@
         <div class="card-body">
           <h5 class="card-title"><i class="fas fa-users me-2"></i>User Management</h5>
           <p class="card-text">View, edit, and manage all user accounts. Change roles and activate/deactivate accounts.</p>
-          <a href="{{ url_for('admin_users') }}" class="btn btn-outline-primary">Manage Users</a>
+          <a href="/admin/users" class="btn btn-outline-primary">Manage Users</a>
         </div>
       </div>
     </div>
@@ -80,8 +139,8 @@
           <h5 class="card-title"><i class="fas fa-user-graduate me-2"></i>Student Management</h5>
           <p class="card-text">Register students, capture faces, train models, and export credentials.</p>
           <div class="d-flex gap-2">
-            <a href="{{ url_for('admin_students') }}" class="btn btn-outline-primary">Manage Students</a>
-            <a href="{{ url_for('admin_credentials') }}" class="btn btn-outline-success">
+            <a href="/admin/students" class="btn btn-outline-primary">Manage Students</a>
+            <a href="/admin/credentials" class="btn btn-outline-success">
               <i class="fas fa-file-csv me-1"></i>Export Credentials
             </a>
           </div>
@@ -93,7 +152,7 @@
         <div class="card-body">
           <h5 class="card-title"><i class="fas fa-chart-pie me-2"></i>Attendance Reports</h5>
           <p class="card-text">View student attendance percentages and search by UID, name, or roll number.</p>
-          <a href="{{ url_for('attendance_students') }}" class="btn btn-outline-primary">
+          <a href="/attendance-students" class="btn btn-outline-primary">
             <i class="fas fa-chart-line me-1"></i>View Attendance
           </a>
         </div>
@@ -114,4 +173,47 @@ fetch('/admin/stats')
   })
   .catch(error => console.error('Error loading stats:', error));
 </script>
-{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">
+              <i class="fas fa-user-check me-2"></i>FaceAttendance
+            </h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking. Fast, accurate, and reliable.</p>
+          </div>
+
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect With Us</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+            <p class="mt-3 mb-0 small">© 2025 Face Attendance System. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+  </body>
+</html>
