@@ -79,7 +79,7 @@ Face Attendance System Team
 '''
     
     html_body = render_template(
-        'emails/verify_email.html',
+        'verify_email.html',
         username=user.username,
         verify_url=verify_url
     )
@@ -118,7 +118,7 @@ Face Attendance System Team
 '''
     
     html_body = render_template(
-        'emails/reset_password.html',
+        'reset_password.html',
         username=user.username,
         reset_url=reset_url
     )
@@ -155,7 +155,7 @@ Face Attendance System Team
 '''
 
     html_body = render_template(
-        'emails/welcome.html',
+        'welcome.html',
         username=user.username,
         login_url=login_url,
         role=user.role.capitalize()
@@ -203,7 +203,7 @@ Face Attendance System Team
 '''
 
     html_body = render_template(
-        'emails/student_credentials.html',
+        'student_credentials.html',
         student_name=student.name,
         student_uid=student.uid,
         student_roll=student.roll,
@@ -246,7 +246,7 @@ Face Attendance System Team
 '''
 
     html_body = render_template(
-        'emails/student_reset_password.html',
+        'student_reset_password.html',
         student_name=student.name,
         reset_url=reset_url
     )

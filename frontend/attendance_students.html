@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Student Attendance - Face Attendance System</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="fas fa-home me-1"></i> Home
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/login">
+                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/student-login">
+                <i class="fas fa-user-graduate me-1"></i> Student Login
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3" id="flash-messages">
+      <!-- Flash messages will be inserted here by JS if needed -->
+    </div>
+
+    <!-- Main Content -->
+    <main class="py-4">
+<div class="container py-4">
+  <!-- Header with Search -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="fw-bold"><i class="fas fa-chart-pie me-2"></i>Student Attendance</h1>
+      <p class="text-muted">View attendance percentage and search by UID</p>
+      <p class="small text-muted mt-1">
+        <i class="fas fa-info-circle me-1"></i>Showing attendance marked by current user only
+      </p>
+    </div>
+    <div>
+      <a href="/attendance" class="btn btn-primary">
+        <i class="fas fa-camera me-2"></i>Mark Attendance
+      </a>
+    </div>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="card mb-4 animated">
+    <div class="card-body">
+      <form method="GET" action="/attendance-students" class="row g-3">
+        <div class="col-md-9">
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="fas fa-search"></i>
+            </span>
+            <input type="text" class="form-control" name="search"
+                   placeholder="Search by Student Name, Roll Number, or UID..."
+                   value="">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-fill">
+              <i class="fas fa-search me-1"></i>Search
+            </button>
+            <a href="/attendance-students" class="btn btn-outline-secondary">
+              <i class="fas fa-times"></i>
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="row g-4 mb-4">
+    <div class="col-md-4">
+      <div class="card stat-card primary animated">
+        <div class="card-body text-center">
+          <i class="fas fa-users"></i>
+          <h3>0</h3>
+          <p>Total Students</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card success animated">
+        <div class="card-body text-center">
+          <i class="fas fa-check-circle"></i>
+          <h3>0</h3>
+          <p>Present Today</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card info animated">
+        <div class="card-body text-center">
+          <i class="fas fa-user-slash"></i>
+          <h3>0</h3>
+          <p>Absent Today</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance Table -->
+  <div class="card animated">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="fas fa-list me-2"></i>Attendance Overview</span>
+      <span class="badge bg-primary">0 Students</span>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Roll Number</th>
+              <th>UID</th>
+              <th>Total Attendance</th>
+              <th>Attendance %</th>
+              <th>Present Today</th>
+              <th>Marked By</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="9" class="text-center text-muted py-4">
+                <i class="fas fa-clipboard-list fa-3x mb-3"></i>
+                <h5>No Attendance Records Yet</h5>
+                <p class="mb-3">You haven't marked attendance for any students yet.</p>
+                <a href="/attendance" class="btn btn-primary">
+                  <i class="fas fa-camera me-2"></i>Mark Attendance Now
+                </a>
+                <p class="mt-3 small text-muted">
+                  <i class="fas fa-info-circle me-1"></i>
+                  Once you mark attendance, students will appear here.
+                </p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info Cards -->
+  <div class="row g-4 mt-4">
+    <div class="col-md-6">
+      <div class="card animated">
+        <div class="card-header bg-info">
+          <i class="fas fa-info-circle me-2"></i>Attendance Percentage
+        </div>
+        <div class="card-body">
+          <p>Attendance percentage is calculated based on the last 30 days period.</p>
+          <ul class="mb-0">
+            <li><span class="badge bg-success">≥75%</span> - Good attendance</li>
+            <li><span class="badge bg-warning">50-74%</span> - Needs improvement</li>
+            <li><span class="badge bg-danger">&lt;50%</span> - Low attendance</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card animated">
+        <div class="card-header bg-primary">
+          <i class="fas fa-search me-2"></i>Search Tips
+        </div>
+        <div class="card-body">
+          <p>You can search by:</p>
+          <ul class="mb-0">
+            <li><strong>Student Name</strong> - e.g., "John"</li>
+            <li><strong>Roll Number</strong> - e.g., "CS001"</li>
+            <li><strong>UID</strong> - Full or partial UID</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Attendance Details Modal -->
+<div class="modal fade" id="attendanceModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="fas fa-chart-bar me-2"></i>Attendance Statistics</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <h4 class="mb-3" id="studentName"></h4>
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="card bg-light text-center">
+              <div class="card-body">
+                <h2 class="mb-0" id="totalAttendance"></h2>
+                <p class="mb-0 text-muted">Total Days</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="card bg-light text-center">
+              <div class="card-body">
+                <h2 class="mb-0" id="attendancePercentage"></h2>
+                <p class="mb-0 text-muted">Attendance %</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="alert alert-info mt-3 mb-0">
+          <i class="fas fa-info-circle me-2"></i>
+          Percentage calculated based on last 30 days period.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showAttendanceDetails(name, total, percentage) {
+  document.getElementById('studentName').textContent = name;
+  document.getElementById('totalAttendance').textContent = total;
+  document.getElementById('attendancePercentage').textContent = percentage + '%';
+
+  new bootstrap.Modal(document.getElementById('attendanceModal')).show();
+}
+</script>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">
+              <i class="fas fa-user-check me-2"></i>FaceAttendance
+            </h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking. Fast, accurate, and reliable.</p>
+          </div>
+
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect With Us</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+            <p class="mt-3 mb-0 small">© 2025 Face Attendance System. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+  </body>
+</html>
