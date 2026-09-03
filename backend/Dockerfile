@@ -32,8 +32,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
         pillow==10.0.1 \
         opencv-python-headless==4.7.0.72 \
         psycopg2-binary==2.9.9 && \
+    CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5" \
     pip install --no-cache-dir \
-        --config-settings=cmake.args="-DCMAKE_POLICY_VERSION_MINIMUM=3.5" \
         dlib==19.24.2 && \
     pip install --no-cache-dir \
         face_recognition==1.3.0 \
