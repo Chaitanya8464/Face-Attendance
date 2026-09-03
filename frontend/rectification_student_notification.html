@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Attendance Updated</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #007bff 0%, #6f42c1 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">📝 Attendance Updated</h1>
+    </div>
+    <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #dee2e6; border-top: none;">
+        <p style="font-size: 16px;">Hello <strong>{{ student_name }}</strong>,</p>
+        <p>Your attendance record has been updated by <strong>{{ admin_name }}</strong>.</p>
+        
+        <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #007bff; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #007bff;">Update Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 8px 0; color: #666;"><strong>Student:</strong></td>
+                    <td style="padding: 8px 0;">{{ student_name }} ({{ student_roll }})</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;"><strong>Updated by:</strong></td>
+                    <td style="padding: 8px 0;">{{ admin_name }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;"><strong>Reason:</strong></td>
+                    <td style="padding: 8px 0;">{{ reason }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;"><strong>Admin notes:</strong></td>
+                    <td style="padding: 8px 0;">{{ admin_notes or 'None provided' }}</td>
+                </tr>
+            </table>
+        </div>
+        
+        <p style="color: #666; font-size: 14px;">If you have any questions about this change, please contact your teacher or admin.</p>
+        
+        <hr style="border: none; border-top: 1px solid #dee2e6; margin: 20px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">Face Attendance System</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d6efd" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Rectification Requests - Admin</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+
+    <style>
+      .request-card { border-left: 4px solid #ffc107; transition: all 0.2s; }
+      .request-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+      .request-card.approved { border-left-color: #28a745; }
+      .request-card.rejected { border-left-color: #dc3545; }
+      .status-badge { font-size: 0.75rem; padding: 0.35rem 0.65rem; }
+      .filter-tabs .nav-link { color: #6c757d; }
+      .filter-tabs .nav-link.active { color: #0d6efd; background: #e7f1ff; }
+    </style>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            {% include '_account_menu.html' %}
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3" id="flash-messages"></div>
+
+    <!-- Main Content -->
+    <main class="py-4">
+<div class="container py-4">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="fw-bold"><i class="fas fa-tasks me-2"></i>Rectification Requests</h1>
+      <p class="text-muted">Review and approve/reject teacher rectification requests</p>
+    </div>
+    <div>
+      <a href="/admin/attendance/rectify" class="btn btn-outline-primary">
+        <i class="fas fa-edit me-2"></i>Direct Rectification
+      </a>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card stat-card warning animated">
+        <div class="card-body text-center">
+          <i class="fas fa-clock"></i>
+          <h3 id="pending-count">-</h3>
+          <p>Pending Review</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card success animated">
+        <div class="card-body text-center">
+          <i class="fas fa-check-circle"></i>
+          <h3 id="approved-count">-</h3>
+          <p>Approved</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card danger animated">
+        <div class="card-body text-center">
+          <i class="fas fa-times-circle"></i>
+          <h3 id="rejected-count">-</h3>
+          <p>Rejected</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card info animated">
+        <div class="card-body text-center">
+          <i class="fas fa-list"></i>
+          <h3 id="total-count">-</h3>
+          <p>Total Requests</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Tabs -->
+  <ul class="nav nav-pills filter-tabs mb-4" id="filterTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="pending-tab" data-bs-toggle="pill" data-bs-target="#pending" type="button" role="tab" onclick="loadRequests('pending')">
+        <i class="fas fa-clock me-1"></i>Pending <span class="badge bg-warning text-dark ms-1" id="tab-pending-count">0</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="approved-tab" data-bs-toggle="pill" data-bs-target="#approved" type="button" role="tab" onclick="loadRequests('approved')">
+        <i class="fas fa-check-circle me-1"></i>Approved <span class="badge bg-success ms-1" id="tab-approved-count">0</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="rejected-tab" data-bs-toggle="pill" data-bs-target="#rejected" type="button" role="tab" onclick="loadRequests('rejected')">
+        <i class="fas fa-times-circle me-1"></i>Rejected <span class="badge bg-danger ms-1" id="tab-rejected-count">0</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="all-tab" data-bs-toggle="pill" data-bs-target="#all" type="button" role="tab" onclick="loadRequests('all')">
+        <i class="fas fa-list me-1"></i>All
+      </button>
+    </li>
+  </ul>
+
+  <!-- Tab Panes -->
+  <div class="tab-content" id="requestTabsContent">
+    <div class="tab-pane fade show active" id="pending" role="tabpanel">
+      <div class="card animated">
+        <div class="card-body p-0">
+          <div class="list-group list-group-flush" id="pending-list">
+            <div class="text-center py-5">
+              <div class="spinner-border text-warning" role="status"></div>
+              <p class="mt-2 text-muted">Loading pending requests...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-pane fade" id="approved" role="tabpanel">
+      <div class="card animated">
+        <div class="card-body p-0">
+          <div class="list-group list-group-flush" id="approved-list">
+            <div class="text-center py-5">
+              <div class="spinner-border text-success" role="status"></div>
+              <p class="mt-2 text-muted">Loading approved requests...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-pane fade" id="rejected" role="tabpanel">
+      <div class="card animated">
+        <div class="card-body p-0">
+          <div class="list-group list-group-flush" id="rejected-list">
+            <div class="text-center py-5">
+              <div class="spinner-border text-danger" role="status"></div>
+              <p class="mt-2 text-muted">Loading rejected requests...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-pane fade" id="all" role="tabpanel">
+      <div class="card animated">
+        <div class="card-body p-0">
+          <div class="list-group list-group-flush" id="all-list">
+            <div class="text-center py-5">
+              <div class="spinner-border text-info" role="status"></div>
+              <p class="mt-2 text-muted">Loading all requests...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    </main>
+
+    <!-- Review Modal -->
+    <div class="modal fade" id="reviewModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-warning">
+            <h5 class="modal-title"><i class="fas fa-gavel me-2"></i>Review Rectification Request</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <form id="reviewForm">
+            <div class="modal-body">
+              <input type="hidden" name="request_id" id="review_request_id">
+              <input type="hidden" name="action" id="review_action">
+              
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Request Details:</strong>
+                <div id="review-request-info"></div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label"><i class="fas fa-comment me-1"></i>Admin Notes</label>
+                <textarea class="form-control" name="admin_notes" id="review_admin_notes" rows="3" placeholder="Add notes for the teacher (optional)..."></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-danger me-2" id="review-reject-btn" onclick="confirmReject()">
+                <i class="fas fa-times me-2"></i>Reject
+              </button>
+              <button type="submit" class="btn btn-success" id="review-approve-btn">
+                <i class="fas fa-check me-2"></i>Approve
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3"><i class="fas fa-user-check me-2"></i>FaceAttendance</h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking.</p>
+          </div>
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/main.js"></script>
+
+    <script>
+    // State
+    let currentFilter = 'pending';
+    let currentPage = 1;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      loadAllCounts();
+      loadRequests('pending');
+    });
+
+    // Load counts for all statuses
+    async function loadAllCounts() {
+      try {
+        const response = await fetch('/api/rectification/pending?status=all&per_page=1');
+        const data = await response.json();
+        if (data.pagination) {
+          document.getElementById('pending-count').textContent = '...';
+          document.getElementById('approved-count').textContent = '...';
+          document.getElementById('rejected-count').textContent = '...';
+          document.getElementById('total-count').textContent = data.pagination.total;
+          
+          // Load individual counts
+          loadStatusCount('pending', 'pending-count', 'tab-pending-count');
+          loadStatusCount('approved', 'approved-count', 'tab-approved-count');
+          loadStatusCount('rejected', 'rejected-count', 'tab-rejected-count');
+        }
+      } catch (error) {
+        console.error('Failed to load counts:', error);
+      }
+    }
+
+    async function loadStatusCount(status, countId, tabCountId) {
+      try {
+        const response = await fetch(`/api/rectification/pending?status=${status}&per_page=1`);
+        const data = await response.json();
+        if (data.pagination) {
+          document.getElementById(countId).textContent = data.pagination.total;
+          document.getElementById(tabCountId).textContent = data.pagination.total;
+        }
+      } catch (error) {
+        console.error(`Failed to load ${status} count:`, error);
+      }
+    }
+
+    // Load requests for a specific status
+    async function loadRequests(status, page = 1) {
+      currentFilter = status;
+      currentPage = page;
+      
+      const listId = `${status}-list`;
+      const list = document.getElementById(listId);
+      list.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-' + (status === 'pending' ? 'warning' : status === 'approved' ? 'success' : 'danger') + '" role="status"></div><p class="mt-2 text-muted">Loading...</p></div>';
+      
+      try {
+        const response = await fetch(`/api/rectification/pending?status=${status}&page=${page}&per_page=20`);
+        const data = await response.json();
+        
+        renderRequestList(data.requests, listId, status);
+        renderPagination(data.pagination, status);
+      } catch (error) {
+        console.error('Failed to load requests:', error);
+        list.innerHTML = '<div class="text-center py-5 text-danger">Failed to load requests</div>';
+      }
+    }
+
+    // Render request list
+    function renderRequestList(requests, listId, status) {
+      const list = document.getElementById(listId);
+      
+      if (requests && requests.length > 0) {
+        list.innerHTML = requests.map(r => `
+          <div class="list-group-item request-card ${r.status}" data-request-id="${r.id}">
+            <div class="d-flex justify-content-between align-items-start">
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <h6 class="mb-0">${r.student_name} (${r.student_roll})</h6>
+                  <span class="status-badge bg-${getStatusColor(r.status)}">${r.status.toUpperCase()}</span>
+                </div>
+                <div class="row g-2 small text-muted">
+                  <div class="col-md-3"><strong>Teacher:</strong> ${r.teacher_name} (${r.teacher_id})</div>
+                  <div class="col-md-3"><strong>Current:</strong> ${r.current_marked_by || 'Self'}</div>
+                  <div class="col-md-3"><strong>Time:</strong> ${r.current_timestamp}</div>
+                  <div class="col-md-3"><strong>Requested:</strong> ${r.requested_timestamp || 'No time change'}</div>
+                </div>
+                ${r.requested_marked_by ? `
+                  <div class="row g-2 small text-muted mt-1">
+                    <div class="col-md-6"><strong>New Teacher:</strong> ${r.requested_marked_by}</div>
+                  </div>
+                ` : ''}
+                <div class="mt-2">
+                  <strong class="text-muted">Reason:</strong>
+                  <p class="mb-0 small">${r.reason}</p>
+                </div>
+                <div class="mt-2">
+                  <small class="text-muted"><i class="fas fa-calendar me-1"></i>Requested: ${r.created_at}</small>
+                </div>
+              </div>
+              ${r.status === 'pending' ? `
+                <div class="ms-3">
+                  <button class="btn btn-sm btn-success me-1" onclick="openReviewModal(${JSON.stringify(r).replace(/"/g, '"')}, 'approve')">
+                    <i class="fas fa-check me-1"></i>Approve
+                  </button>
+                  <button class="btn btn-sm btn-danger" onclick="openReviewModal(${JSON.stringify(r).replace(/"/g, '"')}, 'reject')">
+                    <i class="fas fa-times me-1"></i>Reject
+                  </button>
+                </div>
+              ` : r.status === 'approved' ? `
+                <div class="ms-3">
+                  <span class="badge bg-success">Approved by admin</span>
+                  <small class="text-muted d-block mt-1">${r.reviewed_at || ''}</small>
+                </div>
+              ` : `
+                <div class="ms-3">
+                  <span class="badge bg-danger">Rejected</span>
+                  <small class="text-muted d-block mt-1">${r.reviewed_at || ''}</small>
+                </div>
+              `}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        list.innerHTML = `
+          <div class="text-center py-5">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No ${status.charAt(0).toUpperCase() + status.slice(1)} Requests</h5>
+            <p class="text-muted">No rectification requests with status "${status}" found.</p>
+          </div>
+        `;
+      }
+    }
+
+    function getStatusColor(status) {
+      return status === 'pending' ? 'warning' : status === 'approved' ? 'success' : 'danger';
+    }
+
+    // Render pagination
+    function renderPagination(pagination, status) {
+      if (!pagination || pagination.pages <= 1) return;
+      
+      let html = '<nav class="p-3"><ul class="pagination pagination-sm justify-content-center mb-0">';
+      
+      if (pagination.has_prev) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="loadRequests('${status}', ${pagination.page - 1}); return false;">Previous</a></li>`;
+      }
+      
+      const start = Math.max(1, pagination.page - 2);
+      const end = Math.min(pagination.pages, pagination.page + 2);
+      
+      for (let i = start; i <= end; i++) {
+        html += `<li class="page-item ${i === pagination.page ? 'active' : ''}"><a class="page-link" href="#" onclick="loadRequests('${status}', ${i}); return false;">${i}</a></li>`;
+      }
+      
+      if (pagination.has_next) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="loadRequests('${status}', ${pagination.page + 1}); return false;">Next</a></li>`;
+      }
+      
+      html += '</ul></nav>';
+      
+      // Append to the list
+      const list = document.getElementById(`${status}-list`);
+      list.innerHTML += html;
+    }
+
+    // Open review modal
+    function openReviewModal(request, action) {
+      document.getElementById('review_request_id').value = request.id;
+      document.getElementById('review_action').value = action;
+      document.getElementById('review_admin_notes').value = '';
+      
+      // Update approve button text
+      const approveBtn = document.getElementById('review-approve-btn');
+      if (action === 'approve') {
+        approveBtn.classList.remove('d-none');
+        approveBtn.innerHTML = '<i class="fas fa-check me-2"></i>Approve';
+        document.querySelector('button[onclick="confirmReject()"]').classList.add('d-none');
+      } else {
+        approveBtn.classList.add('d-none');
+        document.querySelector('button[onclick="confirmReject()"]').classList.remove('d-none');
+        document.querySelector('button[onclick="confirmReject()"]').innerHTML = '<i class="fas fa-times me-2"></i>Confirm Reject';
+      }
+      
+      // Show request info
+      document.getElementById('review-request-info').innerHTML = `
+        <div class="row mt-2">
+          <div class="col-md-6"><strong>Student:</strong> ${request.student_name} (${request.student_roll})</div>
+          <div class="col-md-6"><strong>UID:</strong> ${request.student_uid}</div>
+          <div class="col-md-6"><strong>Teacher:</strong> ${request.teacher_name} (${request.teacher_id})</div>
+          <div class="col-md-6"><strong>Current Marked By:</strong> ${request.current_marked_by || 'Self'}</div>
+          <div class="col-md-6"><strong>Current Time:</strong> ${request.current_timestamp}</div>
+          <div class="col-md-6"><strong>Requested Teacher:</strong> ${request.requested_marked_by || 'No change'}</div>
+          <div class="col-md-6"><strong>Requested Time:</strong> ${request.requested_timestamp || 'No change'}</div>
+        </div>
+        <div class="mt-2">
+          <strong class="text-muted">Reason:</strong>
+          <p class="mb-0 small">${request.reason}</p>
+        </div>
+      `;
+      
+      new bootstrap.Modal(document.getElementById('reviewModal')).show();
+    }
+
+    // Confirm reject
+    function confirmReject() {
+      if (confirm('Are you sure you want to reject this request?')) {
+        document.getElementById('review_action').value = 'reject';
+        document.getElementById('reviewForm').dispatchEvent(new Event('submit'));
+      }
+    }
+
+    // Handle review form submit
+    document.getElementById('reviewForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      
+      const btn = document.getElementById(data.action === 'approve' ? 'review-approve-btn' : 'review-reject-btn');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+      
+      try {
+        const response = await fetch('/api/rectification/review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showNotification(result.message, 'success');
+          bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide();
+          loadRequests(currentFilter);
+          loadAllCounts();
+        } else {
+          showNotification(result.error || 'Review failed', 'error');
+        }
+      } catch (error) {
+        console.error('Review error:', error);
+        showNotification('Network error', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    });
+
+    // Show notification
+    function showNotification(message, type = 'info') {
+      const container = document.getElementById('flash-messages');
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+      alert.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+      container.appendChild(alert);
+      setTimeout(() => alert.remove(), 5000);
+    }
+    </script>
+  </body>
+</html>

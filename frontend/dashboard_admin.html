@@ -29,21 +29,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="fas fa-home me-1"></i> Home
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/login">
-                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/student-login">
-                <i class="fas fa-user-graduate me-1"></i> Student Login
-              </a>
-            </li>
+            {% include '_account_menu.html' %}
 
             <li class="nav-item">
               <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
@@ -122,7 +108,7 @@
     </div>
   </div>
 
-  <!-- Quick Actions -->
+<!-- Quick Actions -->
   <div class="row g-4 mb-4">
     <div class="col-md-4">
       <div class="card animated">
@@ -140,7 +126,7 @@
           <p class="card-text">Register students, capture faces, train models, and export credentials.</p>
           <div class="d-flex gap-2">
             <a href="/admin/students" class="btn btn-outline-primary">Manage Students</a>
-            <a href="/admin/credentials" class="btn btn-outline-success">
+            <a href="/admin/credentials/export" class="btn btn-outline-success">
               <i class="fas fa-file-csv me-1"></i>Export Credentials
             </a>
           </div>
@@ -152,9 +138,59 @@
         <div class="card-body">
           <h5 class="card-title"><i class="fas fa-chart-pie me-2"></i>Attendance Reports</h5>
           <p class="card-text">View student attendance percentages and search by UID, name, or roll number.</p>
-          <a href="/attendance-students" class="btn btn-outline-primary">
+          <a href="/attendance/students" class="btn btn-outline-primary">
             <i class="fas fa-chart-line me-1"></i>View Attendance
           </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rectification Management -->
+  <div class="row g-4 mb-4">
+    <div class="col-md-12">
+      <div class="card animated">
+        <div class="card-header bg-warning">
+          <h5 class="card-title mb-0"><i class="fas fa-tasks me-2"></i>Rectification Requests</h5>
+        </div>
+        <div class="card-body">
+          <p class="card-text">Review and approve/reject teacher rectification requests. <strong>Approve = mark attendance as absent (delete record)</strong>, <strong>Reject = keep original attendance</strong>.</p>
+          <div class="d-flex gap-2">
+            <a href="/admin/rectification/requests" class="btn btn-warning">
+              <i class="fas fa-gavel me-2"></i>Manage Rectification Requests
+            </a>
+            <a href="/admin/attendance/rectify" class="btn btn-outline-warning">
+              <i class="fas fa-edit me-2"></i>Direct Rectification
+            </a>
+          </div>
+          <div class="mt-3">
+            <div class="row g-2" id="rectification-stats">
+              <div class="col-md-3">
+                <div class="card stat-card warning text-center py-2">
+                  <h5 class="mb-0" id="rect-pending">-</h5>
+                  <small>Pending</small>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card success text-center py-2">
+                  <h5 class="mb-0" id="rect-approved">-</h5>
+                  <small>Approved (Absent)</small>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card danger text-center py-2">
+                  <h5 class="mb-0" id="rect-rejected">-</h5>
+                  <small>Rejected</small>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card info text-center py-2">
+                  <h5 class="mb-0" id="rect-total">-</h5>
+                  <small>Total</small>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -172,6 +208,39 @@ fetch('/admin/stats')
     document.getElementById('total-students').textContent = data.total_students;
   })
   .catch(error => console.error('Error loading stats:', error));
+
+// Load rectification statistics
+fetch('/api/rectification/pending?status=all&per_page=1')
+  .then(response => response.json())
+  .then(data => {
+    if (data.pagination) {
+      // We need to get counts for each status
+      loadRectificationCounts();
+    }
+  })
+  .catch(error => console.error('Error loading rectification stats:', error));
+
+async function loadRectificationCounts() {
+  try {
+    const statuses = ['pending', 'approved', 'rejected'];
+    for (const status of statuses) {
+      const response = await fetch(`/api/rectification/pending?status=${status}&per_page=1`);
+      const data = await response.json();
+      if (data.pagination) {
+        const element = document.getElementById(`rect-${status === 'pending' ? 'pending' : status === 'approved' ? 'approved' : 'rejected'}`);
+        if (element) element.textContent = data.pagination.total;
+      }
+    }
+    // Total
+    const totalResponse = await fetch('/api/rectification/pending?status=all&per_page=1');
+    const totalData = await totalResponse.json();
+    if (totalData.pagination) {
+      document.getElementById('rect-total').textContent = totalData.pagination.total;
+    }
+  } catch (error) {
+    console.error('Error loading rectification counts:', error);
+  }
+}
 </script>
     </main>
 

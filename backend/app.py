@@ -21,10 +21,10 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 FRONTEND_ROOT = os.path.join(BASE_DIR, '..', 'frontend')  # frontend is at same level as backend
 
 # Import models and utilities
-from models import db, Student, Attendance, User
+from models import db, Student, Attendance, User, Notification, RectificationRequest
 from face_utils import encode_faces, recognize_faces_from_frame, save_base64_image
 from auth_utils import login_manager, admin_required, teacher_required, verified_required, update_last_login
-from email_utils import mail, send_verification_email, send_password_reset_email, send_welcome_email
+from email_utils import mail, send_verification_email, send_password_reset_email, send_welcome_email, send_attendance_notification, send_low_attendance_notification, send_attendance_marked_to_admin, create_notification, send_rectification_request_to_admin, send_rectification_decision_to_teacher, send_rectification_notification_to_student
 
 app = Flask(__name__,
             template_folder=FRONTEND_ROOT,
@@ -130,6 +130,11 @@ def student_login():
             user = User.query.filter_by(id=student.user_id).first()
 
             if user and user.is_student():
+                # Keep the student session available to the student-specific
+                # dashboard, profile, and first-login password flow.
+                session['student_id'] = student.id
+                session['student_name'] = student.name
+                session['student_roll'] = student.roll
                 login_user(user, remember=remember)
                 flash(f'Welcome back, {student.name}!', 'success')
 
@@ -425,7 +430,7 @@ def student_profile():
             existing = Student.query.filter_by(email=email).first()
             if existing and existing.id != student.id:
                 return render_template('profile.html', student=student, error='Email already registered')
-            student.email = email
+        student.email = email or None
 
         db.session.commit()
 
@@ -611,7 +616,35 @@ def dashboard():
     elif current_user.is_teacher():
         return render_template('dashboard_teacher.html')
     else:  # student
-        return render_template('dashboard_student.html')
+        return redirect(url_for('student_dashboard'))
+
+
+@app.route('/notifications')
+@teacher_required
+def notifications():
+    """Notifications page for admin/teacher"""
+    return render_template('notifications.html')
+
+
+@app.route('/admin/attendance/rectify')
+@admin_required
+def admin_attendance_rectify():
+    """Attendance rectification page for admin"""
+    return render_template('attendance_rectify.html')
+
+
+@app.route('/admin/rectification/requests')
+@admin_required
+def admin_rectification_requests():
+    """Admin page to review rectification requests"""
+    return render_template('rectification_admin.html')
+
+
+@app.route('/teacher/rectification/requests')
+@teacher_required
+def teacher_rectification_requests():
+    """Teacher page to view their rectification requests"""
+    return render_template('rectification_teacher.html')
 
 
 # -----------------------
@@ -793,15 +826,14 @@ def train():
         data = encode_faces()
         total = len(data.get('encodings', [])) if data else 0
         
-        # Mark all students with encodings as trained
-        rolls_trained = data.get('rolls', [])
-        for roll in rolls_trained:
-            student = Student.query.filter_by(roll=roll).first()
-            if student and not student.is_trained:
-                student.is_trained = True
-                student.trained_at = datetime.utcnow()
+        # Keep every student's training status in sync with the encodings that
+        # were successfully generated during this training run.
+        rolls_trained = set(data.get('rolls', []))
+        for student in Student.query.all():
+            student.is_trained = student.roll in rolls_trained
+            student.trained_at = datetime.utcnow() if student.is_trained else None
         db.session.commit()
-        
+
         return render_template('train.html', total=total, trained_count=len(rolls_trained))
     except Exception as e:
         print(f"[ERROR] Training failed: {e}")
@@ -814,6 +846,10 @@ def train():
 # -----------------------
 @app.route('/attendance')
 def attendance_page():
+    # Students may mark their own attendance from a student session. Staff can
+    # mark attendance for the group. Anonymous access is not permitted.
+    if not session.get('student_id') and not current_user.is_authenticated:
+        return redirect(url_for('login'))
     return render_template('attendance.html')
 
 
@@ -828,6 +864,9 @@ def api_start_recognize():
     NOTE: This is for server-side camera only. Client-side uses /api/recognize_attendance
     """
     try:
+        if not current_user.is_authenticated or current_user.is_student():
+            return jsonify({'error': 'Staff login required for server-camera recognition'}), 403
+
         cam = cv2.VideoCapture(0)
         ret, frame = cam.read()
         cam.release()
@@ -874,6 +913,66 @@ def api_start_recognize():
         return jsonify({'error': 'Recognition failed'}), 500
 
 
+def check_and_send_low_attendance_alert(student, threshold=75):
+    """
+    Check if student's attendance is below threshold and send notification.
+    
+    Args:
+        student: Student object
+        threshold: Attendance percentage threshold (default 75%)
+    """
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+    
+    # Calculate attendance for last 30 days
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+    
+    total_days = db.session.query(func.count(func.distinct(
+        func.date(Attendance.timestamp)
+    ))).filter(
+        Attendance.student_id == student.id,
+        Attendance.timestamp >= thirty_days_ago
+    ).scalar() or 0
+    
+    # 30 days = ~22 working days (assuming 5 days/week)
+    working_days = 22
+    attendance_percentage = (total_days / working_days * 100) if working_days > 0 else 0
+    attendance_percentage = min(100, attendance_percentage)
+    
+    if attendance_percentage < threshold:
+        # Check if we already sent a low attendance notification recently (last 7 days)
+        week_ago = datetime.now() - timedelta(days=7)
+        recent_notif = Notification.query.filter(
+            Notification.student_id == student.id,
+            Notification.type == 'low_attendance',
+            Notification.created_at >= week_ago
+        ).first()
+        
+        if not recent_notif:
+            # Send email to student
+            try:
+                send_low_attendance_notification(student, round(attendance_percentage, 1), threshold)
+            except Exception as e:
+                print(f"Failed to send low attendance email: {e}")
+            
+            # Create in-app notification for admins
+            try:
+                admins = User.query.filter_by(role='admin').all()
+                for admin in admins:
+                    create_notification(
+                        user_id=admin.id,
+                        student_id=student.id,
+                        notif_type='low_attendance',
+                        title=f'Low Attendance Alert: {student.name}',
+                        message=f'{student.name} ({student.roll}) attendance is {attendance_percentage:.1f}% (below {threshold}% threshold)'
+                    )
+            except Exception as e:
+                print(f"Failed to create low attendance notification: {e}")
+            
+            return True
+    return False
+
+
 # -----------------------
 # Client Image Recognition (browser upload)
 # -----------------------
@@ -888,6 +987,16 @@ def api_recognize_attendance():
     Tracks which teacher/admin marked the attendance.
     """
     try:
+        session_student_id = session.get('student_id')
+        linked_student_id = None
+        if current_user.is_authenticated and current_user.is_student():
+            linked_student = Student.query.filter_by(user_id=current_user.id).first()
+            linked_student_id = linked_student.id if linked_student else None
+
+        allowed_student_id = session_student_id or linked_student_id
+        if not allowed_student_id and not current_user.is_authenticated:
+            return jsonify({'error': 'Login required'}), 401
+
         data = request.get_json()
         image_b64 = data.get('image')
 
@@ -903,6 +1012,7 @@ def api_recognize_attendance():
 
         results = recognize_faces_from_frame(frame)
         recognized = []
+        unrecognized = []
 
         # Get current user if logged in (teacher/admin)
         marked_by_user_id = None
@@ -913,19 +1023,37 @@ def api_recognize_attendance():
 
         for res in results:
             roll = res.get('name')
+            box = res.get('box')
             if roll and roll != 'Unknown':
                 student = Student.query.filter_by(roll=roll).first()
                 if student:
+                    # A student session can only mark the logged-in student's
+                    # attendance. Staff sessions may mark any recognized student.
+                    if allowed_student_id and student.id != allowed_student_id:
+                        continue
+
                     # Only allow trained students to mark attendance
                     if not student.is_trained:
                         continue  # Skip untrained students
 
                     # Prevent duplicate attendance for same day
                     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                    existing_att = Attendance.query.filter(
-                        Attendance.student_id == student.id,
-                        Attendance.timestamp >= today_start
-                    ).first()
+                    
+                    # For students: prevent any duplicate for the day
+                    # For teachers/admins: prevent duplicate only for this teacher (they can mark even if another teacher already did)
+                    if allowed_student_id:
+                        # Student marking their own attendance - global duplicate check
+                        existing_att = Attendance.query.filter(
+                            Attendance.student_id == student.id,
+                            Attendance.timestamp >= today_start
+                        ).first()
+                    else:
+                        # Teacher/admin marking attendance - per-teacher duplicate check
+                        existing_att = Attendance.query.filter(
+                            Attendance.student_id == student.id,
+                            Attendance.timestamp >= today_start,
+                            Attendance.marked_by == marked_by_user_id
+                        ).first()
 
                     if not existing_att:
                         att = Attendance(
@@ -936,13 +1064,53 @@ def api_recognize_attendance():
                         db.session.add(att)
                         db.session.commit()
 
+                        # Send notifications
+                        marked_at = datetime.now()
+                        
+                        # 1. Send email to student
+                        try:
+                            send_attendance_notification(student, marked_by_name or 'Self', marked_at)
+                        except Exception as e:
+                            print(f"Failed to send student notification: {e}")
+                        
+                        # 2. Create in-app notification for admins
+                        try:
+                            admins = User.query.filter_by(role='admin').all()
+                            for admin in admins:
+                                create_notification(
+                                    user_id=admin.id,
+                                    student_id=student.id,
+                                    notif_type='attendance_marked',
+                                    title=f'Attendance Marked: {student.name}',
+                                    message=f'Attendance marked for {student.name} ({student.roll}) by {marked_by_name or "Self"} at {marked_at.strftime("%Y-%m-%d %H:%M:%S")}'
+                                )
+                                # Also send email to admin
+                                send_attendance_marked_to_admin(admin, student, marked_by_name or 'Self', marked_at)
+                        except Exception as e:
+                            print(f"Failed to create admin notification: {e}")
+                        
+                        # 3. Check for low attendance and send alert
+                        try:
+                            check_and_send_low_attendance_alert(student)
+                        except Exception as e:
+                            print(f"Failed to check low attendance: {e}")
+
                     recognized.append({
                         'roll': student.roll,
                         'name': student.name,
-                        'uid': student.uid
+                        'uid': student.uid,
+                        'box': box
                     })
+            else:
+                # Unrecognized face detected
+                unrecognized.append({
+                    'box': box
+                })
 
-        return jsonify({'recognized': recognized}), 200
+        return jsonify({
+            'recognized': recognized,
+            'unrecognized': unrecognized
+        }), 200
 
     except Exception as e:
         print(f"[ERROR] Attendance recognition failed: {e}")
@@ -973,11 +1141,799 @@ def api_stats():
 
 
 # -----------------------
+# API: Notifications
+# -----------------------
+@app.route('/api/notifications', methods=['GET'])
+@teacher_required
+def api_get_notifications():
+    """Get notifications for current user (admin/teacher)"""
+    user_id = current_user.id
+    is_admin = current_user.is_admin()
+    
+    # For admins, show all notifications
+    # For teachers, show notifications related to students they've marked
+    if is_admin:
+        notifications = Notification.query.filter_by(user_id=user_id)\
+            .order_by(Notification.created_at.desc())\
+            .limit(50).all()
+    else:
+        # Get students this teacher has marked attendance for
+        marked_student_ids = db.session.query(
+            Attendance.student_id
+        ).filter_by(
+            marked_by_name=current_user.username
+        ).distinct().subquery()
+        
+        notifications = Notification.query.filter(
+            Notification.student_id.in_(marked_student_ids)
+        ).order_by(Notification.created_at.desc())\
+        .limit(50).all()
+    
+    unread_count = Notification.query.filter_by(user_id=user_id, is_read=False).count()
+    
+    return jsonify({
+        'notifications': [{
+            'id': n.id,
+            'type': n.type,
+            'title': n.title,
+            'message': n.message,
+            'student_name': n.student.name if n.student else None,
+            'student_roll': n.student.roll if n.student else None,
+            'is_read': n.is_read,
+            'created_at': n.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        } for n in notifications],
+        'unread_count': unread_count
+    })
+
+
+@app.route('/api/notifications/<int:notif_id>/read', methods=['POST'])
+@teacher_required
+def api_mark_notification_read(notif_id):
+    """Mark notification as read"""
+    notification = Notification.query.get_or_404(notif_id)
+    
+    # Check permission
+    if not current_user.is_admin() and notification.student_id:
+        # Check if teacher marked this student
+        marked = Attendance.query.filter_by(
+            student_id=notification.student_id,
+            marked_by_name=current_user.username
+        ).first()
+        if not marked:
+            return jsonify({'error': 'Unauthorized'}), 403
+    
+    notification.is_read = True
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+
+@app.route('/api/notifications/read-all', methods=['POST'])
+@teacher_required
+def api_mark_all_notifications_read():
+    """Mark all notifications as read for current user"""
+    user_id = current_user.id
+    
+    if current_user.is_admin():
+        Notification.query.filter_by(user_id=user_id, is_read=False).update({'is_read': True})
+    else:
+        # Only mark notifications for students this teacher has marked
+        marked_student_ids = db.session.query(
+            Attendance.student_id
+        ).filter_by(
+            marked_by_name=current_user.username
+        ).distinct().subquery()
+        
+        Notification.query.filter(
+            Notification.student_id.in_(marked_student_ids),
+            Notification.is_read == False
+        ).update({'is_read': True}, synchronize_session=False)
+    
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+
+@app.route('/api/check-low-attendance', methods=['POST'])
+@admin_required
+def api_check_low_attendance():
+    """Manually trigger low attendance check for all students (admin only)"""
+    students = Student.query.filter_by(is_trained=True).all()
+    alerts_sent = 0
+    
+    for student in students:
+        if check_and_send_low_attendance_alert(student):
+            alerts_sent += 1
+    
+    return jsonify({
+        'success': True,
+        'students_checked': len(students),
+        'alerts_sent': alerts_sent
+    })
+
+
+@admin_required
+def api_rectify_attendance():
+    """
+    Rectify/Correct an attendance record (Admin direct rectification).
+    Can change: marked_by, marked_by_name, timestamp, or delete the record.
+    
+    Expected JSON:
+    {
+        "attendance_id": 123,
+        "action": "update" | "delete",
+        "marked_by": 456,  # optional - user ID of teacher
+        "marked_by_name": "New Teacher Name",  # optional
+        "timestamp": "2026-09-01 10:30:00",  # optional - ISO format
+        "reason": "Reason for rectification"  # required
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        attendance_id = data.get('attendance_id')
+        action = data.get('action', 'update')
+        reason = data.get('reason', '').strip()
+        
+        if not attendance_id:
+            return jsonify({'error': 'Attendance ID required'}), 400
+        
+        if not reason:
+            return jsonify({'error': 'Reason for rectification required'}), 400
+        
+        attendance = Attendance.query.get_or_404(attendance_id)
+        
+        if action == 'delete':
+            # Store info for notification before deletion
+            student = attendance.student
+            marked_by_name = attendance.marked_by_name
+            timestamp = attendance.timestamp
+            
+            # Create rectification log notification
+            admins = User.query.filter_by(role='admin').all()
+            for admin in admins:
+                create_notification(
+                    user_id=admin.id,
+                    student_id=student.id,
+                    notif_type='attendance_rectified',
+                    title=f'Attendance Deleted: {student.name}',
+                    message=f'Attendance for {student.name} ({student.roll}) on {timestamp.strftime("%Y-%m-%d %H:%M:%S")} was deleted by {current_user.username}. Reason: {reason}'
+                )
+            
+            db.session.delete(attendance)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Attendance record deleted'})
+        
+        elif action == 'update':
+            old_marked_by = attendance.marked_by
+            old_marked_by_name = attendance.marked_by_name
+            old_timestamp = attendance.timestamp
+            
+            # Update fields if provided
+            if 'marked_by' in data and data['marked_by']:
+                new_user = User.query.get(data['marked_by'])
+                if not new_user:
+                    return jsonify({'error': 'Invalid teacher/user ID'}), 400
+                attendance.marked_by = new_user.id
+                attendance.marked_by_name = new_user.username
+            
+            if 'marked_by_name' in data and data['marked_by_name']:
+                attendance.marked_by_name = data['marked_by_name']
+            
+            if 'timestamp' in data and data['timestamp']:
+                try:
+                    attendance.timestamp = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
+                except ValueError:
+                    return jsonify({'error': 'Invalid timestamp format. Use ISO format (YYYY-MM-DDTHH:MM:SS)'}), 400
+            
+            db.session.commit()
+            
+            # Create rectification log notification
+            student = attendance.student
+            changes = []
+            if old_marked_by != attendance.marked_by:
+                changes.append(f"marked_by: {old_marked_by_name} -> {attendance.marked_by_name}")
+            if old_timestamp != attendance.timestamp:
+                changes.append(f"time: {old_timestamp.strftime('%Y-%m-%d %H:%M:%S')} -> {attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            admins = User.query.filter_by(role='admin').all()
+            for admin in admins:
+                create_notification(
+                    user_id=admin.id,
+                    student_id=student.id,
+                    notif_type='attendance_rectified',
+                    title=f'Attendance Rectified: {student.name}',
+                    message=f'Attendance for {student.name} ({student.roll}) rectified by {current_user.username}. Changes: {"; ".join(changes)}. Reason: {reason}'
+                )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Attendance record updated',
+                'attendance': {
+                    'id': attendance.id,
+                    'student_name': student.name,
+                    'student_roll': student.roll,
+                    'marked_by_name': attendance.marked_by_name,
+                    'timestamp': attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            })
+        
+        else:
+            return jsonify({'error': 'Invalid action. Use "update" or "delete"'}), 400
+            
+    except Exception as e:
+        print(f"[ERROR] Attendance rectification failed: {e}")
+        return jsonify({'error': 'Rectification failed'}), 500
+
+
+# -----------------------
+# API: Direct Attendance Rectification (Admin only)
+# -----------------------
+@app.route('/api/attendance/rectify', methods=['POST'])
+@admin_required
+def api_rectify_attendance():
+    """
+    Direct rectification of attendance by admin (without teacher request).
+    Can change: marked_by, marked_by_name, timestamp, or delete the record.
+    
+    Expected JSON:
+    {
+        "attendance_id": 123,
+        "action": "update" | "delete",
+        "marked_by": 456,  # optional - user ID of teacher
+        "marked_by_name": "New Teacher Name",  # optional
+        "timestamp": "2026-09-01 10:30:00",  # optional - ISO format
+        "reason": "Reason for rectification"  # required
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        attendance_id = data.get('attendance_id')
+        action = data.get('action', 'update')
+        reason = data.get('reason', '').strip()
+        
+        if not attendance_id:
+            return jsonify({'error': 'Attendance ID required'}), 400
+        
+        if not reason:
+            return jsonify({'error': 'Reason for rectification required'}), 400
+        
+        attendance = Attendance.query.get_or_404(attendance_id)
+        
+        if action == 'delete':
+            student = attendance.student
+            timestamp = attendance.timestamp
+            
+            # Create rectification log notification
+            admins = User.query.filter_by(role='admin').all()
+            for admin in admins:
+                create_notification(
+                    user_id=admin.id,
+                    student_id=student.id,
+                    notif_type='attendance_rectified',
+                    title=f'Attendance Deleted: {student.name}',
+                    message=f'Attendance for {student.name} ({student.roll}) on {timestamp.strftime("%Y-%m-%d %H:%M:%S")} was deleted by {current_user.username}. Reason: {reason}'
+                )
+            
+            db.session.delete(attendance)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Attendance record deleted'})
+        
+        elif action == 'update':
+            old_marked_by = attendance.marked_by
+            old_marked_by_name = attendance.marked_by_name
+            old_timestamp = attendance.timestamp
+            
+            # Update fields if provided
+            if 'marked_by' in data and data['marked_by']:
+                new_user = User.query.get(data['marked_by'])
+                if not new_user:
+                    return jsonify({'error': 'Invalid teacher/user ID'}), 400
+                attendance.marked_by = new_user.id
+                attendance.marked_by_name = new_user.username
+            
+            if 'marked_by_name' in data and data['marked_by_name']:
+                attendance.marked_by_name = data['marked_by_name']
+            
+            if 'timestamp' in data and data['timestamp']:
+                try:
+                    attendance.timestamp = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
+                except ValueError:
+                    return jsonify({'error': 'Invalid timestamp format. Use ISO format (YYYY-MM-DDTHH:MM:SS)'}), 400
+            
+            db.session.commit()
+            
+            # Create rectification log notification
+            student = attendance.student
+            changes = []
+            if old_marked_by != attendance.marked_by:
+                changes.append(f"marked_by: {old_marked_by_name} -> {attendance.marked_by_name}")
+            if old_timestamp != attendance.timestamp:
+                changes.append(f"time: {old_timestamp.strftime('%Y-%m-%d %H:%M:%S')} -> {attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            admins = User.query.filter_by(role='admin').all()
+            for admin in admins:
+                create_notification(
+                    user_id=admin.id,
+                    student_id=student.id,
+                    notif_type='attendance_rectified',
+                    title=f'Attendance Rectified: {student.name}',
+                    message=f'Attendance for {student.name} ({student.roll}) rectified by {current_user.username}. Changes: {"; ".join(changes)}. Reason: {reason}'
+                )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Attendance record updated',
+                'attendance': {
+                    'id': attendance.id,
+                    'student_name': student.name,
+                    'student_roll': student.roll,
+                    'marked_by_name': attendance.marked_by_name,
+                    'timestamp': attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            })
+        
+        else:
+            return jsonify({'error': 'Invalid action. Use "update" or "delete"'}), 400
+            
+    except Exception as e:
+        print(f"[ERROR] Attendance rectification failed: {e}")
+        return jsonify({'error': 'Rectification failed'}), 500
+
+
+# -----------------------
+# Rectification Request Workflow (Teacher -> Admin)
+# -----------------------
+@app.route('/api/attendance/today-by-student/<int:student_id>', methods=['GET'])
+@teacher_required
+def api_get_today_attendance_by_student(student_id):
+    """Get today's attendance record for a specific student marked by current teacher"""
+    try:
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        attendance = Attendance.query.filter(
+            Attendance.student_id == student_id,
+            Attendance.timestamp >= today_start,
+            Attendance.marked_by_name == current_user.username
+        ).first()
+        
+        if not attendance:
+            return jsonify({'attendance': None})
+        
+        return jsonify({
+            'attendance': {
+                'id': attendance.id,
+                'student_id': attendance.student_id,
+                'marked_by': attendance.marked_by,
+                'marked_by_name': attendance.marked_by_name,
+                'timestamp': attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            }
+        })
+    except Exception as e:
+        print(f"[ERROR] Get today attendance failed: {e}")
+        return jsonify({'error': 'Failed to fetch attendance'}), 500
+
+
+@app.route('/api/rectification/request', methods=['POST'])
+@teacher_required
+def api_submit_rectification_request():
+    """
+    Teacher submits a rectification request for an attendance record.
+    
+    Expected JSON:
+    {
+        "attendance_id": 123,
+        "requested_marked_by": 456,  # optional - new teacher ID
+        "requested_timestamp": "2026-09-01 10:30:00",  # optional - ISO format
+        "reason": "Reason for rectification"  # required
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        attendance_id = data.get('attendance_id')
+        reason = data.get('reason', '').strip()
+        
+        if not attendance_id:
+            return jsonify({'error': 'Attendance ID required'}), 400
+        
+        if not reason:
+            return jsonify({'error': 'Reason for rectification request required'}), 400
+        
+        attendance = Attendance.query.get_or_404(attendance_id)
+        
+        # Check if teacher marked this attendance or has permission
+        if attendance.marked_by_name != current_user.username:
+            return jsonify({'error': 'You can only request rectification for attendance you marked'}), 403
+        
+        # Check if request already exists and is pending
+        existing = RectificationRequest.query.filter_by(
+            attendance_id=attendance_id,
+            status='pending'
+        ).first()
+        if existing:
+            return jsonify({'error': 'A pending request already exists for this record'}), 400
+        
+        # Validate requested changes
+        requested_marked_by = data.get('requested_marked_by')
+        requested_timestamp = data.get('requested_timestamp')
+        
+        if requested_marked_by:
+            new_teacher = User.query.get(requested_marked_by)
+            if not new_teacher or not new_teacher.is_teacher():
+                return jsonify({'error': 'Invalid teacher ID'}), 400
+        
+        if requested_timestamp:
+            try:
+                requested_timestamp = datetime.fromisoformat(requested_timestamp.replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({'error': 'Invalid timestamp format. Use ISO format (YYYY-MM-DDTHH:MM:SS)'}), 400
+        
+        # Create rectification request
+        rect_request = RectificationRequest(
+            attendance_id=attendance_id,
+            student_id=attendance.student_id,
+            teacher_id=current_user.id,
+            requested_marked_by=requested_marked_by,
+            requested_timestamp=requested_timestamp,
+            reason=reason,
+            status='pending'
+        )
+        db.session.add(rect_request)
+        db.session.commit()
+        
+        # Notify admins
+        try:
+            admins = User.query.filter_by(role='admin').all()
+            teacher = current_user
+            student = attendance.student
+            
+            for admin in admins:
+                # Create in-app notification
+                create_notification(
+                    user_id=admin.id,
+                    student_id=student.id,
+                    notif_type='rectification_request',
+                    title=f'Rectification Request: {student.name}',
+                    message=f'{teacher.username} requested rectification for {student.name} ({student.roll}). Reason: {reason}'
+                )
+                
+                # Send email
+                send_rectification_request_to_admin(admin, rect_request, teacher, student, attendance)
+        except Exception as e:
+            print(f"Failed to notify admins: {e}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Rectification request submitted successfully',
+            'request_id': rect_request.id
+        })
+        
+    except Exception as e:
+        print(f"[ERROR] Submit rectification request failed: {e}")
+        return jsonify({'error': 'Failed to submit request'}), 500
+
+
+@app.route('/api/rectification/pending', methods=['GET'])
+@admin_required
+def api_get_pending_rectifications():
+    """Get all pending rectification requests for admin review"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        status = request.args.get('status', 'pending')
+        
+        query = RectificationRequest.query.join(Attendance).join(Student).join(User, RectificationRequest.teacher_id == User.id)\
+            .order_by(RectificationRequest.created_at.desc())
+        
+        if status != 'all':
+            query = query.filter(RectificationRequest.status == status)
+        
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return jsonify({
+            'requests': [{
+                'id': r.id,
+                'attendance_id': r.attendance_id,
+                'student_name': r.student.name,
+                'student_roll': r.student.roll,
+                'student_uid': r.student.uid,
+                'teacher_name': r.teacher.username,
+                'teacher_id': r.teacher.teacher_id,
+                'current_marked_by': r.attendance.marked_by_name,
+                'current_timestamp': r.attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'requested_marked_by': r.new_marked_by.username if r.new_marked_by else None,
+                'requested_marked_by_id': r.requested_marked_by,
+                'requested_timestamp': r.requested_timestamp.strftime('%Y-%m-%d %H:%M:%S') if r.requested_timestamp else None,
+                'reason': r.reason,
+                'status': r.status,
+                'created_at': r.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'reviewed_at': r.reviewed_at.strftime('%Y-%m-%d %H:%M:%S') if r.reviewed_at else None
+            } for r in pagination.items],
+            'pagination': {
+                'page': pagination.page,
+                'per_page': pagination.per_page,
+                'total': pagination.total,
+                'pages': pagination.pages,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        })
+    except Exception as e:
+        print(f"[ERROR] Get pending rectifications failed: {e}")
+        return jsonify({'error': 'Failed to fetch requests'}), 500
+
+
+@app.route('/api/rectification/review', methods=['POST'])
+@admin_required
+def api_review_rectification_request():
+    """
+    Admin reviews and decides on a rectification request.
+    
+    Expected JSON:
+    {
+        "request_id": 123,
+        "action": "approve" | "reject",
+        "admin_notes": "Optional notes"
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        request_id = data.get('request_id')
+        action = data.get('action')
+        admin_notes = data.get('admin_notes', '').strip()
+        
+        if not request_id:
+            return jsonify({'error': 'Request ID required'}), 400
+        
+        if action not in ['approve', 'reject']:
+            return jsonify({'error': 'Action must be "approve" or "reject"'}), 400
+        
+        rect_request = RectificationRequest.query.get_or_404(request_id)
+        
+        if rect_request.status != 'pending':
+            return jsonify({'error': f'Request already {rect_request.status}'}), 400
+        
+        attendance = rect_request.attendance
+        student = rect_request.student
+        teacher = rect_request.teacher
+        
+        if action == 'approve':
+            # Approve = mark attendance as absent (delete the attendance record)
+            student = rect_request.student
+            teacher = rect_request.teacher
+            
+            # Store attendance info for notification before deletion
+            attendance_info = f"{attendance.student.name} ({attendance.student.roll}) on {attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+            marked_by = attendance.marked_by_name
+            
+            # Delete the attendance record (mark as absent)
+            db.session.delete(attendance)
+            db.session.commit()
+            
+            # Update request status
+            rect_request.status = 'approved'
+            rect_request.admin_id = current_user.id
+            rect_request.admin_notes = admin_notes
+            rect_request.reviewed_at = datetime.now()
+            db.session.commit()
+            
+            # Notify teacher (with error handling)
+            try:
+                send_rectification_decision_to_teacher(teacher, rect_request, student, current_user, True)
+            except Exception as e:
+                print(f"Failed to notify teacher: {e}")
+            
+            # Notify student (with error handling)
+            try:
+                send_rectification_notification_to_student(student, rect_request, current_user, True)
+            except Exception as e:
+                print(f"Failed to notify student: {e}")
+            
+            # Notify admins (with error handling)
+            try:
+                admins = User.query.filter_by(role='admin').all()
+                for admin in admins:
+                    create_notification(
+                        user_id=admin.id,
+                        student_id=student.id,
+                        notif_type='attendance_rectified',
+                        title=f'Attendance Marked Absent: {student.name}',
+                        message=f'Request from {teacher.username} approved by {current_user.username}. Attendance record for {attendance_info} marked as absent (deleted). Reason: {rect_request.reason}'
+                    )
+            except Exception as e:
+                print(f"Failed to notify admins: {e}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Request approved - attendance marked as absent (record deleted)',
+                'action': 'deleted'
+            })
+        
+        else:  # reject
+            rect_request.status = 'rejected'
+            rect_request.admin_id = current_user.id
+            rect_request.admin_notes = admin_notes
+            rect_request.reviewed_at = datetime.now()
+            db.session.commit()
+            
+            # Notify teacher
+            send_rectification_decision_to_teacher(teacher, rect_request, student, current_user, False)
+            
+            # Notify admins
+            admins = User.query.filter_by(role='admin').all()
+            for admin in admins:
+                create_notification(
+                    user_id=admin.id,
+                    student_id=student.id,
+                    notif_type='rectification_rejected',
+                    title=f'Rectification Rejected: {student.name}',
+                    message=f'Request from {teacher.username} rejected by {current_user.username}. Reason: {rect_request.reason}. Admin notes: {admin_notes}'
+                )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Request rejected'
+            })
+            
+    except Exception as e:
+        print(f"[ERROR] Review rectification request failed: {e}")
+        return jsonify({'error': 'Failed to review request'}), 500
+
+
+@app.route('/api/rectification/my-requests', methods=['GET'])
+@teacher_required
+def api_get_my_rectification_requests():
+    """Get rectification requests submitted by current teacher"""
+    try:
+        requests = RectificationRequest.query.filter_by(teacher_id=current_user.id)\
+            .order_by(RectificationRequest.created_at.desc()).all()
+        
+        return jsonify({
+            'requests': [{
+                'id': r.id,
+                'attendance_id': r.attendance_id,
+                'student_name': r.student.name,
+                'student_roll': r.student.roll,
+                'current_marked_by': r.attendance.marked_by_name,
+                'current_timestamp': r.attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'requested_marked_by': r.new_marked_by.username if r.new_marked_by else None,
+                'requested_timestamp': r.requested_timestamp.strftime('%Y-%m-%d %H:%M:%S') if r.requested_timestamp else None,
+                'reason': r.reason,
+                'status': r.status,
+                'admin_notes': r.admin_notes,
+                'created_at': r.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'reviewed_at': r.reviewed_at.strftime('%Y-%m-%d %H:%M:%S') if r.reviewed_at else None
+            } for r in requests]
+        })
+    except Exception as e:
+        print(f"[ERROR] Get my rectification requests failed: {e}")
+        return jsonify({'error': 'Failed to fetch requests'}), 500
+
+
+# -----------------------
 # API: Export Attendance to CSV
 # -----------------------
+    """Get all attendance records with pagination and filters (admin only)"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    student_id = request.args.get('student_id', type=int)
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    marked_by = request.args.get('marked_by')
+    
+    query = Attendance.query.join(Student).order_by(Attendance.timestamp.desc())
+    
+    if student_id:
+        query = query.filter(Attendance.student_id == student_id)
+    
+    if date_from:
+        try:
+            query = query.filter(Attendance.timestamp >= datetime.fromisoformat(date_from))
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            query = query.filter(Attendance.timestamp <= datetime.fromisoformat(date_to))
+        except ValueError:
+            pass
+    
+    if marked_by:
+        query = query.filter(Attendance.marked_by_name == marked_by)
+    
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    return jsonify({
+        'records': [{
+            'id': a.id,
+            'student_id': a.student_id,
+            'student_name': a.student.name,
+            'student_roll': a.student.roll,
+            'student_uid': a.student.uid,
+            'marked_by': a.marked_by,
+            'marked_by_name': a.marked_by_name,
+            'timestamp': a.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'date': a.timestamp.strftime('%Y-%m-%d'),
+            'time': a.timestamp.strftime('%H:%M:%S')
+        } for a in pagination.items],
+        'pagination': {
+            'page': pagination.page,
+            'per_page': pagination.per_page,
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'has_next': pagination.has_next,
+            'has_prev': pagination.has_prev
+        }
+    })
+
+
+@app.route('/api/teachers/list')
+@teacher_required
+def api_teachers_list():
+    """Get list of all teachers for dropdowns"""
+    teachers = User.query.filter_by(role='teacher', is_active=True).all()
+    return jsonify({
+        'teachers': [{
+            'id': t.id,
+            'username': t.username,
+            'teacher_id': t.teacher_id,
+            'email': t.email
+        } for t in teachers]
+    })
+
+
+# -----------------------
+# API: Export Attendance to CSV
+# -----------------------
+@app.route('/admin/attendance/export')
+@admin_required
+def admin_attendance_export():
+    """Export attendance records to CSV (admin page)"""
+    attendance_records = Attendance.query.join(Student).order_by(Attendance.timestamp.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Student Roll', 'Student Name', 'Student UID', 'Marked By', 'Timestamp', 'Date', 'Time'])
+
+    for record in attendance_records:
+        writer.writerow([
+            record.id,
+            record.student.roll if record.student else 'N/A',
+            record.student.name if record.student else 'N/A',
+            record.student.uid if record.student else 'N/A',
+            record.marked_by_name or 'Self',
+            record.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            record.timestamp.strftime('%Y-%m-%d'),
+            record.timestamp.strftime('%H:%M:%S')
+        ])
+
+    output.seek(0)
+    response = make_response(output.getvalue())
+    response.headers['Content-Disposition'] = f'attachment; filename=attendance_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+    response.headers['Content-type'] = 'text/csv'
+    return response
+
+
 @app.route('/api/export/csv')
 def export_csv():
-    """Export attendance records to CSV"""
+    """Export attendance records to CSV (API)"""
     # TODO: Add pagination for large datasets
     attendance_records = Attendance.query.order_by(Attendance.timestamp.desc()).all()
 
@@ -1175,7 +2131,18 @@ def admin_students():
     if os.path.exists(dataset_dir):
         files = os.listdir(dataset_dir)
 
-    return render_template('students.html', students=students, files=files)
+    image_counts = {
+        student.id: sum(file.startswith(f'{student.roll}_') for file in files)
+        for student in students
+    }
+    trained_students = sum(student.is_trained for student in students)
+
+    return render_template(
+        'students.html',
+        students=students,
+        image_counts=image_counts,
+        trained_students=trained_students,
+    )
 
 
 # ========================================
@@ -1469,7 +2436,13 @@ def admin_delete_student_get(student_id):
 def admin_credentials():
     """Admin panel - View and export student credentials"""
     students = Student.query.order_by(Student.added_on.desc()).all()
-    return render_template('credentials_list.html', students=students)
+    return render_template(
+        'credentials_list.html',
+        students=students,
+        credentials_sent_count=sum(student.credentials_sent for student in students),
+        trained_students_count=sum(student.is_trained for student in students),
+        pending_credentials_count=sum(not student.credentials_sent for student in students),
+    )
 
 
 @app.route('/admin/credentials/export')
@@ -1485,7 +2458,10 @@ def admin_export_credentials():
 
     # Create CSV file in memory
     output = io.StringIO()
-    fieldnames = ['Name', 'Roll Number', 'UID', 'Temporary Password', 'Email', 'Added On', 'Credentials Sent', 'Trained']
+    fieldnames = [
+        'Name', 'Roll Number', 'Student UID', 'Generated Password', 'Email',
+        'Added On', 'Credentials Sent', 'Password Changed', 'Trained'
+    ]
     writer = csv.DictWriter(output, fieldnames=fieldnames)
 
     writer.writeheader()
@@ -1493,11 +2469,14 @@ def admin_export_credentials():
         writer.writerow({
             'Name': student.name,
             'Roll Number': student.roll,
-            'UID': student.uid,
-            'Temporary Password': student.temporary_password or 'N/A (Password changed)',
+            'Student UID': student.uid,
+            # Export the original generated password, not the student's current
+            # password hash or a password they chose after first login.
+            'Generated Password': student.temporary_password or 'Unavailable (legacy student)',
             'Email': student.email or 'N/A',
             'Added On': student.added_on.strftime('%Y-%m-%d %H:%M:%S') if student.added_on else 'N/A',
             'Credentials Sent': 'Yes' if student.credentials_sent else 'No',
+            'Password Changed': 'Yes' if student.password_changed_at else 'No',
             'Trained': 'Yes' if student.is_trained else 'No'
         })
 

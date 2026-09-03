@@ -29,21 +29,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="fas fa-home me-1"></i> Home
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/login">
-                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/student-login">
-                <i class="fas fa-user-graduate me-1"></i> Student Login
-              </a>
-            </li>
+            {% include '_account_menu.html' %}
 
             <li class="nav-item">
               <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
@@ -74,11 +60,13 @@
               <i class="fas fa-user"></i>
             </div>
           </div>
-          <h2 class="fw-bold mb-1">Student Name</h2>
-          <p class="text-muted mb-2">Roll: STU001</p>
-          <span class="badge bg-success">
-            <i class="fas fa-check-circle me-1"></i>Face Trained
-          </span>
+          <h2 class="fw-bold mb-1">{{ student.name }}</h2>
+          <p class="text-muted mb-2">Roll: {{ student.roll }}</p>
+          {% if student.is_trained %}
+            <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Face Trained</span>
+          {% else %}
+            <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Training Pending</span>
+          {% endif %}
         </div>
       </div>
 
@@ -93,7 +81,7 @@
               <label class="form-label fw-semibold">
                 <i class="fas fa-id-badge me-2 text-primary"></i>Student UID
               </label>
-              <input type="text" class="form-control font-monospace" value="UID123456789" readonly>
+              <input type="text" class="form-control font-monospace" value="{{ student.uid }}" readonly>
               <div class="form-text">UID cannot be changed</div>
             </div>
 
@@ -107,7 +95,7 @@
                   class="form-control"
                   name="name"
                   id="nameInput"
-                  value="Student Name"
+                  value="{{ student.name }}"
                   required
                 >
               </div>
@@ -123,7 +111,7 @@
                   class="form-control"
                   name="email"
                   id="emailInput"
-                  value="student@example.com"
+                  value="{{ student.email or '' }}"
                   placeholder="Enter your email (optional)"
                 >
               </div>
@@ -135,7 +123,7 @@
                 <i class="fas fa-calendar me-2 text-primary"></i>Registration Date
               </label>
               <input type="text" class="form-control"
-                     value="January 01, 2025 at 12:00" readonly>
+                     value="{{ student.added_on.strftime('%B %d, %Y at %H:%M') if student.added_on else 'Not available' }}" readonly>
             </div>
 
             <div class="mb-3">
@@ -143,7 +131,7 @@
                 <i class="fas fa-key me-2 text-primary"></i>Password Last Changed
               </label>
               <input type="text" class="form-control"
-                     value="Not changed yet" readonly>
+                     value="{{ student.password_changed_at.strftime('%B %d, %Y at %H:%M') if student.password_changed_at else 'Not changed yet' }}" readonly>
             </div>
 
             <hr class="my-4">
@@ -152,7 +140,7 @@
               <button type="submit" class="btn btn-primary btn-lg">
                 <i class="fas fa-save me-2"></i>Save Changes
               </button>
-              <a href="/dashboard" class="btn btn-outline-secondary">
+              <a href="/student-dashboard" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
               </a>
             </div>
@@ -168,7 +156,7 @@
           </a>
         </div>
         <div class="col-6">
-          <a href="/dashboard" class="btn btn-outline-secondary w-100">
+          <a href="/student-dashboard" class="btn btn-outline-secondary w-100">
             <i class="fas fa-tachometer-alt me-2"></i>Dashboard
           </a>
         </div>
@@ -195,7 +183,7 @@
               <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
               <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
               <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
-              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+              <li><a href="/student-dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
             </ul>
           </div>
 

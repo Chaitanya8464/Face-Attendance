@@ -29,21 +29,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="fas fa-home me-1"></i> Home
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/login">
-                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/student-login">
-                <i class="fas fa-user-graduate me-1"></i> Student Login
-              </a>
-            </li>
+            {% include '_account_menu.html' %}
 
             <li class="nav-item">
               <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
@@ -82,7 +68,7 @@
       <div class="card stat-card primary animated">
         <div class="card-body text-center">
           <i class="fas fa-users"></i>
-          <h3>0</h3>
+          <h3>{{ teacher_stats|length }}</h3>
           <p>Total Teachers</p>
         </div>
       </div>
@@ -91,7 +77,7 @@
       <div class="card stat-card success animated">
         <div class="card-body text-center">
           <i class="fas fa-user-check"></i>
-          <h3>0</h3>
+          <h3>{{ teacher_stats|selectattr('teacher.is_active')|list|length }}</h3>
           <p>Active Teachers</p>
         </div>
       </div>
@@ -100,7 +86,7 @@
       <div class="card stat-card info animated">
         <div class="card-body text-center">
           <i class="fas fa-clipboard-check"></i>
-          <h3>0</h3>
+          <h3>{{ teacher_stats|sum(attribute='total_marked') }}</h3>
           <p>Total Attendance Marked</p>
         </div>
       </div>
@@ -132,15 +118,47 @@
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td colspan="9" class="text-center text-muted py-4">
-                <i class="fas fa-user-slash fa-3x mb-3"></i>
-                <p>No teachers registered yet.</p>
-                <a href="/admin/teachers/add" class="btn btn-primary">
-                  <i class="fas fa-user-plus me-2"></i>Add First Teacher
-                </a>
-              </td>
-            </tr>
+            {% if teacher_stats %}
+              {% for stat in teacher_stats %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ stat.teacher.teacher_id or 'N/A' }}</td>
+                <td>{{ stat.teacher.username }}</td>
+                <td>{{ stat.teacher.email }}</td>
+                <td>{{ stat.teacher.created_at.strftime('%Y-%m-%d') if stat.teacher.created_at else 'N/A' }}</td>
+                <td>{{ stat.total_marked }}</td>
+                <td>{{ stat.recent_marked }}</td>
+                <td>
+                  {% if stat.teacher.is_active %}
+                    <span class="badge bg-success">Active</span>
+                  {% else %}
+                    <span class="badge bg-danger">Inactive</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="/admin/teachers/{{ stat.teacher.id }}/details" class="btn btn-sm btn-outline-info" title="View Details">
+                    <i class="fas fa-eye"></i>
+                  </a>
+                  <a href="/admin/teachers/{{ stat.teacher.id }}/edit" class="btn btn-sm btn-outline-primary" title="Edit">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDelete({{ stat.teacher.id }}, '{{ stat.teacher.username }}')" title="Delete">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="9" class="text-center text-muted py-4">
+                  <i class="fas fa-user-slash fa-3x mb-3"></i>
+                  <p>No teachers registered yet.</p>
+                  <a href="/admin/teachers/add" class="btn btn-primary">
+                    <i class="fas fa-user-plus me-2"></i>Add First Teacher
+                  </a>
+                </td>
+              </tr>
+            {% endif %}
           </tbody>
         </table>
       </div>

@@ -29,21 +29,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="fas fa-home me-1"></i> Home
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/login">
-                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/student-login">
-                <i class="fas fa-user-graduate me-1"></i> Student Login
-              </a>
-            </li>
+            {% include '_account_menu.html' %}
 
             <li class="nav-item">
               <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
@@ -109,6 +95,7 @@
                 - A unique <strong>Teacher ID</strong> (e.g., TF001) will be automatically generated<br>
                 - Teacher ID format: <strong>TF</strong> + 3 digits (sequential)<br>
                 - If password is not provided, a secure password will be auto-generated<br>
+                - Teachers sign in using their <strong>email address and password</strong><br>
                 - Teacher account will be auto-verified and activated
               </small>
             </div>

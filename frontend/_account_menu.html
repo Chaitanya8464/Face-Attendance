@@ -1,0 +1,65 @@
+<li class="nav-item">
+  <a class="nav-link" href="/">
+    <i class="fas fa-home me-1"></i> Home
+  </a>
+</li>
+{% if current_user.is_authenticated or session.get('student_id') %}
+  {% if current_user.is_authenticated and (current_user.is_admin() or current_user.is_teacher()) %}
+  <li class="nav-item dropdown">
+    <button class="nav-link dropdown-toggle border-0 bg-transparent text-start position-relative" type="button"
+            data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="fas fa-bell me-1"></i> Notifications
+      <span id="notification-badge" class="position-absolute top-0 start-100 translate-middle badge bg-danger rounded-pill d-none">
+        <span id="unread-count">0</span>
+      </span>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end shadow" style="min-width: 350px;">
+      <li><h6 class="dropdown-header">Notifications</h6></li>
+      <li><hr class="dropdown-divider"></li>
+      <li>
+        <div id="notification-list" class="text-center py-2">
+          <div class="spinner-border spinner-border-sm" role="status"></div>
+          <small class="text-muted ms-2">Loading...</small>
+        </div>
+      </li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item" href="/notifications"><i class="fas fa-list me-2"></i>View All</a></li>
+    </ul>
+  </li>
+{% endif %}
+
+<li class="nav-item dropdown">
+    <button class="nav-link dropdown-toggle border-0 bg-transparent text-start" type="button"
+            data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="fas fa-user-circle me-1"></i> Profile
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end shadow">
+      {% if current_user.is_authenticated %}
+        <li><span class="dropdown-item-text text-muted small">Signed in as {{ current_user.username }}</span></li>
+        <li><a class="dropdown-item" href="/dashboard"><i class="fas fa-table-columns me-2"></i>Dashboard</a></li>
+        {% if current_user.is_student() %}
+          <li><a class="dropdown-item" href="/student/profile"><i class="fas fa-id-card me-2"></i>My Profile</a></li>
+        {% endif %}
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+      {% else %}
+        <li><span class="dropdown-item-text text-muted small">Signed in as {{ session.get('student_name', 'Student') }}</span></li>
+        <li><a class="dropdown-item" href="/student-dashboard"><i class="fas fa-table-columns me-2"></i>Dashboard</a></li>
+        <li><a class="dropdown-item" href="/student/profile"><i class="fas fa-id-card me-2"></i>My Profile</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="/student-logout"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+      {% endif %}
+    </ul>
+  </li>
+{% else %}
+  <li class="nav-item">
+    <a class="nav-link" href="/login">
+      <i class="fas fa-sign-in-alt me-1"></i> Staff Login
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="/student-login">
+      <i class="fas fa-user-graduate me-1"></i> Student Login
+    </a>
+  </li>
+{% endif %}

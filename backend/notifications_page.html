@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notifications - Face Attendance System</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            <li class="nav-item">
+  <a class="nav-link" href="/">
+    <i class="fas fa-home me-1"></i> Home
+  </a>
+</li>
+
+  
+  <li class="nav-item dropdown">
+    <button class="nav-link dropdown-toggle border-0 bg-transparent text-start position-relative" type="button"
+            data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="fas fa-bell me-1"></i> Notifications
+      <span id="notification-badge" class="position-absolute top-0 start-100 translate-middle badge bg-danger rounded-pill d-none">
+        <span id="unread-count">0</span>
+      </span>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end shadow" style="min-width: 350px;">
+      <li><h6 class="dropdown-header">Notifications</h6></li>
+      <li><hr class="dropdown-divider"></li>
+      <li>
+        <div id="notification-list" class="text-center py-2">
+          <div class="spinner-border spinner-border-sm" role="status"></div>
+          <small class="text-muted ms-2">Loading...</small>
+        </div>
+      </li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item" href="/notifications"><i class="fas fa-list me-2"></i>View All</a></li>
+    </ul>
+  </li>
+
+
+<li class="nav-item dropdown">
+    <button class="nav-link dropdown-toggle border-0 bg-transparent text-start" type="button"
+            data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="fas fa-user-circle me-1"></i> Profile
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end shadow">
+      
+        <li><span class="dropdown-item-text text-muted small">Signed in as admin</span></li>
+        <li><a class="dropdown-item" href="/dashboard"><i class="fas fa-table-columns me-2"></i>Dashboard</a></li>
+        
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+      
+    </ul>
+  </li>
+
+
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3" id="flash-messages">
+    </div>
+
+    <!-- Main Content -->
+    <main class="py-4">
+<div class="container py-4">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="fw-bold"><i class="fas fa-bell me-2"></i>Notifications</h1>
+      <p class="text-muted">View all system notifications</p>
+    </div>
+    <div>
+      <button class="btn btn-outline-primary" onclick="markAllRead()" id="markAllReadBtn">
+        <i class="fas fa-check-double me-2"></i>Mark All as Read
+      </button>
+    </div>
+  </div>
+
+  <!-- Notifications List -->
+  <div class="card animated">
+    <div class="card-body p-0">
+      <div class="list-group list-group-flush" id="notifications-list">
+        <div class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="text-muted mt-2">Loading notifications...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State (hidden by default) -->
+  <div class="card mt-3 animated d-none" id="empty-state">
+    <div class="card-body text-center py-5">
+      <i class="fas fa-bell-slash fa-4x text-muted mb-3"></i>
+      <h5 class="text-muted">No Notifications</h5>
+      <p class="text-muted">You're all caught up!</p>
+    </div>
+  </div>
+</div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">
+              <i class="fas fa-user-check me-2"></i>FaceAttendance
+            </h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking. Fast, accurate, and reliable.</p>
+          </div>
+
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect With Us</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+            <p class="mt-3 mb-0 small">© 2025 Face Attendance System. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+
+    <script>
+    // Load notifications on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadNotifications();
+      loadDropdownNotifications();
+      
+      // Auto-refresh dropdown every 30 seconds
+      setInterval(loadDropdownNotifications, 30000);
+    });
+
+    async function loadNotifications() {
+      try {
+        const response = await fetch('/api/notifications');
+        const data = await response.json();
+        
+        const list = document.getElementById('notifications-list');
+        const emptyState = document.getElementById('empty-state');
+        
+        if (data.notifications && data.notifications.length > 0) {
+          emptyState.classList.add('d-none');
+          list.innerHTML = '';
+          
+          data.notifications.forEach(notif => {
+            const item = document.createElement('div');
+            item.className = `list-group-item ${!notif.is_read ? 'unread fw-bold' : ''}`;
+            item.dataset.notifId = notif.id;
+            
+            const typeIcons = {
+              'attendance_marked': 'fa-check-circle text-success',
+              'low_attendance': 'fa-exclamation-triangle text-warning',
+              'student_registered': 'fa-user-plus text-info',
+              'teacher_added': 'fa-chalkboard-teacher text-primary',
+              'system': 'fa-cog text-secondary'
+            };
+            
+            const iconClass = typeIcons[notif.type] || 'fa-bell text-secondary';
+            
+            item.innerHTML = `
+              <div class="d-flex align-items-start">
+                <div class="me-3 mt-1">
+                  <i class="fas ${iconClass} fa-lg"></i>
+                </div>
+                <div class="flex-grow-1">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <h6 class="mb-1">${notif.title}</h6>
+                    <small class="text-muted">${notif.created_at}</small>
+                  </div>
+                  <p class="mb-1 small">${notif.message}</p>
+                  ${notif.student_name ? `<small class="text-muted"><i class="fas fa-user me-1"></i>${notif.student_name} (${notif.student_roll})</small>` : ''}
+                </div>
+                ${!notif.is_read ? `
+                  <button class="btn btn-sm btn-outline-primary ms-2" onclick="markRead(${notif.id}, this)">
+                    <i class="fas fa-check"></i>
+                  </button>
+                ` : ''}
+              </div>
+            `;
+            list.appendChild(item);
+          });
+        } else {
+          list.innerHTML = '';
+          emptyState.classList.remove('d-none');
+        }
+        
+        // Update badge
+        updateNotificationBadge(data.unread_count || 0);
+      } catch (error) {
+        console.error('Failed to load notifications:', error);
+      }
+    }
+
+    async function loadDropdownNotifications() {
+      try {
+        const response = await fetch('/api/notifications');
+        const data = await response.json();
+        
+        const dropdownList = document.getElementById('notification-list');
+        const badge = document.getElementById('notification-badge');
+        const unreadCount = document.getElementById('unread-count');
+        
+        if (data.notifications && data.notifications.length > 0) {
+          dropdownList.innerHTML = '';
+          
+          data.notifications.slice(0, 5).forEach(notif => {
+            const typeIcons = {
+              'attendance_marked': 'fa-check-circle text-success',
+              'low_attendance': 'fa-exclamation-triangle text-warning',
+              'student_registered': 'fa-user-plus text-info',
+              'teacher_added': 'fa-chalkboard-teacher text-primary',
+              'system': 'fa-cog text-secondary'
+            };
+            
+            const iconClass = typeIcons[notif.type] || 'fa-bell text-secondary';
+            
+            const item = document.createElement('li');
+            item.innerHTML = `
+              <a class="dropdown-item ${!notif.is_read ? 'fw-bold' : ''}" href="/notifications">
+                <div class="d-flex align-items-start">
+                  <i class="fas ${iconClass} me-2 mt-1"></i>
+                  <div>
+                    <div class="small">${notif.title}</div>
+                    <small class="text-muted">${notif.created_at}</small>
+                  </div>
+                </div>
+              </a>
+            `;
+            dropdownList.appendChild(item);
+          });
+          
+          // Add view all link if more than 5
+          if (data.notifications.length > 5) {
+            const item = document.createElement('li');
+            item.innerHTML = `<a class="dropdown-item text-center" href="/notifications">View all ${data.notifications.length} notifications</a>`;
+            dropdownList.appendChild(item);
+          }
+        } else {
+          dropdownList.innerHTML = `
+            <li><span class="dropdown-item-text text-muted text-center py-2">No notifications</span></li>
+          `;
+        }
+        
+        updateNotificationBadge(data.unread_count || 0);
+      } catch (error) {
+        console.error('Failed to load dropdown notifications:', error);
+      }
+    }
+
+    function updateNotificationBadge(count) {
+      const badge = document.getElementById('notification-badge');
+      const unreadCount = document.getElementById('unread-count');
+      if (badge && unreadCount) {
+        unreadCount.textContent = count;
+        if (count > 0) {
+          badge.classList.remove('d-none');
+        } else {
+          badge.classList.add('d-none');
+        }
+      }
+    }
+
+    async function markRead(notifId, btn) {
+      try {
+        const response = await fetch(`/api/notifications/${notifId}/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        if (data.success) {
+          const item = document.querySelector(`[data-notif-id="${notifId}"]`);
+          if (item) {
+            item.classList.remove('unread', 'fw-bold');
+            if (btn) btn.remove();
+          }
+          loadDropdownNotifications();
+        }
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error);
+      }
+    }
+
+    async function markAllRead() {
+      try {
+        const response = await fetch('/api/notifications/read-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        if (data.success) {
+          loadNotifications();
+          loadDropdownNotifications();
+        }
+      } catch (error) {
+        console.error('Failed to mark all as read:', error);
+      }
+    }
+    </script>
+  </body>
+</html>

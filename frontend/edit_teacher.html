@@ -29,21 +29,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="fas fa-home me-1"></i> Home
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/login">
-                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/student-login">
-                <i class="fas fa-user-graduate me-1"></i> Student Login
-              </a>
-            </li>
+            {% include '_account_menu.html' %}
 
             <li class="nav-item">
               <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
@@ -78,7 +64,7 @@
                 <i class="fas fa-user me-1"></i>Username
               </label>
               <input type="text" class="form-control" id="username" name="username"
-                     value="teacher_username" required>
+                     value="{{ teacher.username }}" required>
             </div>
 
             <!-- Email -->
@@ -87,7 +73,17 @@
                 <i class="fas fa-envelope me-1"></i>Email Address
               </label>
               <input type="email" class="form-control" id="email" name="email"
-                     value="teacher@example.com">
+                     value="{{ teacher.email }}">
+            </div>
+
+            <!-- Teacher ID (Read-only) -->
+            <div class="mb-3">
+              <label for="teacher_id" class="form-label">
+                <i class="fas fa-id-badge me-1"></i>Teacher ID
+              </label>
+              <input type="text" class="form-control" id="teacher_id" name="teacher_id"
+                     value="{{ teacher.teacher_id }}" readonly>
+              <small class="text-muted">Teacher ID cannot be changed</small>
             </div>
 
             <!-- New Password (Optional) -->
@@ -105,9 +101,9 @@
               <i class="fas fa-info-circle me-2"></i>
               <strong>Current Information:</strong><br>
               <small>
-                Joined: January 01, 2025<br>
+                Joined: {{ teacher.created_at.strftime('%B %d, %Y') if teacher.created_at else 'N/A' }}<br>
                 Role: Teacher<br>
-                Status: Active
+                Status: {% if teacher.is_active %}Active{% else %}Inactive{% endif %}
               </small>
             </div>
 

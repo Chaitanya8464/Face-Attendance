@@ -29,21 +29,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="fas fa-home me-1"></i> Home
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/login">
-                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/student-login">
-                <i class="fas fa-user-graduate me-1"></i> Student Login
-              </a>
-            </li>
+            {% include '_account_menu.html' %}
 
             <li class="nav-item">
               <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
@@ -66,8 +52,8 @@
   <!-- Student Header -->
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-      <h1 class="fw-bold"><i class="fas fa-user-graduate me-2"></i>Student Dashboard</h1>
-      <p class="text-muted">View your attendance records</p>
+      <h1 class="fw-bold"><i class="fas fa-user-graduate me-2"></i>{{ student.name }}</h1>
+      <p class="text-muted">Roll: {{ student.roll }} · UID: <span class="font-monospace">{{ student.uid }}</span></p>
     </div>
   </div>
 
@@ -77,8 +63,8 @@
       <div class="card stat-card primary animated">
         <div class="card-body text-center">
           <i class="fas fa-camera"></i>
-          <h3>Mark</h3>
-          <p>Attendance</p>
+          <h3>{% if marked_today %}Marked{% else %}Mark{% endif %}</h3>
+          <p>Attendance Today</p>
           <a href="/attendance" class="btn btn-light mt-2">Mark Now</a>
         </div>
       </div>
@@ -87,9 +73,9 @@
       <div class="card stat-card success animated">
         <div class="card-body text-center">
           <i class="fas fa-calendar-check"></i>
-          <h3>View</h3>
+          <h3>{{ total_attendance }}</h3>
           <p>My Records</p>
-          <a href="/dashboard" class="btn btn-light mt-2">View Records</a>
+          <a href="/student/attendance" class="btn btn-light mt-2">View Records</a>
         </div>
       </div>
     </div>
@@ -97,9 +83,9 @@
       <div class="card stat-card info animated">
         <div class="card-body text-center">
           <i class="fas fa-chart-bar"></i>
-          <h3>Stats</h3>
-          <p>My Stats</p>
-          <a href="#" class="btn btn-light mt-2 disabled">Coming Soon</a>
+          <h3>{{ attendance_percentage }}%</h3>
+          <p>Attendance Rate</p>
+          <a href="/student/attendance" class="btn btn-light mt-2">View Stats</a>
         </div>
       </div>
     </div>

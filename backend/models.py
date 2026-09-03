@@ -171,7 +171,7 @@ class Student(db.Model):
     roll = db.Column(db.String(20), unique=True, nullable=False)
     uid = db.Column(db.String(36), unique=True, nullable=False, index=True)  # Unique generated ID
     password_hash = db.Column(db.String(255), nullable=True)  # Hashed password for login
-    temporary_password = db.Column(db.String(50), nullable=True)  # Store temporary password for export (cleared after password change)
+    temporary_password = db.Column(db.String(50), nullable=True)  # Original generated password retained for administrator exports
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     email = db.Column(db.String(120), unique=True, nullable=True, index=True)  # Student email
     # The face_encoding stores the 128-dimensional vector as a BLOB
@@ -225,3 +225,98 @@ class Attendance(db.Model):
 
     def __repr__(self):
         return f"Attendance('{self.student_id}', '{self.timestamp}')"
+
+
+class Notification(db.Model):
+    """
+    Notification model - stores all system notifications.
+    
+    Types:
+        - attendance_marked: When attendance is marked for a student
+        - low_attendance: When student attendance falls below threshold
+        - student_registered: When new student is registered
+        - teacher_added: When new teacher is added
+        - system: General system notifications
+    
+    Attributes:
+        id: Primary key
+        user_id: Foreign key to User table (who receives notification)
+        student_id: Foreign key to Student table (related student, if any)
+        type: Notification type
+        title: Short title
+        message: Detailed message
+        is_read: Whether notification has been read
+        created_at: When notification was created
+    """
+    __tablename__ = 'notification'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Admin/Teacher who receives
+    student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=True)  # Related student
+    type = db.Column(db.String(50), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    is_read = db.Column(db.Boolean, default=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.now, index=True)
+    
+    # Relationships
+    user = db.relationship('User', backref='notifications', lazy=True)
+    student = db.relationship('Student', backref='notifications', lazy=True)
+    
+    def __repr__(self):
+        return f"Notification('{self.type}', '{self.title}')"
+
+
+class RectificationRequest(db.Model):
+    """
+    Rectification Request model - tracks teacher requests for attendance correction.
+    
+    Workflow:
+        1. Teacher submits request for a student's attendance rectification
+        2. Request appears in admin portal with status "pending"
+        3. Admin reviews and either approves (rectifies) or rejects
+        4. If approved, attendance is updated and notifications sent
+        5. Teacher and student notified of outcome
+    
+    Statuses:
+        - pending: Awaiting admin review
+        - approved: Admin approved and rectified
+        - rejected: Admin rejected the request
+        - cancelled: Teacher cancelled the request
+    
+    Attributes:
+        id: Primary key
+        attendance_id: Foreign key to Attendance table
+        student_id: Foreign key to Student table
+        teacher_id: Foreign key to User table (requesting teacher)
+        admin_id: Foreign key to User table (reviewing admin)
+        requested_marked_by: New teacher ID to assign (optional)
+        requested_timestamp: New timestamp (optional)
+        reason: Teacher's reason for request
+        admin_notes: Admin's notes on decision
+        status: Request status
+        created_at: When request was submitted
+        reviewed_at: When admin reviewed
+    """
+    __tablename__ = 'rectification_request'
+    id = db.Column(db.Integer, primary_key=True)
+    attendance_id = db.Column(db.Integer, db.ForeignKey('attendance.id'), nullable=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
+    teacher_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    requested_marked_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    requested_timestamp = db.Column(db.DateTime, nullable=True)
+    reason = db.Column(db.Text, nullable=False)
+    admin_notes = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), nullable=False, default='pending', index=True)  # pending, approved, rejected, cancelled
+    created_at = db.Column(db.DateTime, default=datetime.now, index=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships
+    attendance = db.relationship('Attendance', backref='rectification_requests', lazy=True)
+    student = db.relationship('Student', backref='rectification_requests', lazy=True)
+    teacher = db.relationship('User', foreign_keys=[teacher_id], backref='submitted_rectifications', lazy=True)
+    admin = db.relationship('User', foreign_keys=[admin_id], backref='reviewed_rectifications', lazy=True)
+    new_marked_by = db.relationship('User', foreign_keys=[requested_marked_by], backref='assigned_rectifications', lazy=True)
+    
+    def __repr__(self):
+        return f"RectificationRequest('{self.id}', '{self.status}')"

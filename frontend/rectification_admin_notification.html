@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Rectification Request</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">📋 Rectification Request</h1>
+    </div>
+    <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #dee2e6; border-top: none;">
+        <p style="font-size: 16px;">Hello <strong>{{ admin_name }}</strong>,</p>
+        <p>A teacher has submitted a rectification request for a student's attendance record.</p>
+        
+        <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #ffc107; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #856404;">Request Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 8px 0; color: #666;"><strong>Student:</strong></td>
+                    <td style="padding: 8px 0;">{{ student_name }} ({{ student_roll }})</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;"><strong>Requested by:</strong></td>
+                    <td style="padding: 8px 0;">{{ teacher_name }} ({{ teacher_id }})</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;"><strong>Current marked by:</strong></td>
+                    <td style="padding: 8px 0;">{{ current_marked_by }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;"><strong>Current time:</strong></td>
+                    <td style="padding: 8px 0;">{{ current_time }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;"><strong>Requested change:</strong></td>
+                    <td style="padding: 8px 0;">{{ requested_change }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666; vertical-align: top;"><strong>Reason:</strong></td>
+                    <td style="padding: 8px 0;">{{ reason }}</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="#" style="background: #ffc107; color: #333; padding: 12px 30px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block;">
+                Review Request
+            </a>
+        </div>
+        
+        <hr style="border: none; border-top: 1px solid #dee2e6; margin: 20px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">Face Attendance System</p>
+    </div>
+</body>
+</html>

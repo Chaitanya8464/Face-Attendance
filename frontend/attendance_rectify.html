@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d6efd" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Attendance Rectification - Admin</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+
+    <style>
+      .rectify-modal .modal-body { max-height: 60vh; overflow-y: auto; }
+      .attendance-row:hover { background-color: #f8f9fa; }
+      .filter-card { border-left: 4px solid #0d6efd; }
+    </style>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            {% include '_account_menu.html' %}
+
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3" id="flash-messages">
+    </div>
+
+    <!-- Main Content -->
+    <main class="py-4">
+<div class="container py-4">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="fw-bold"><i class="fas fa-edit me-2"></i>Attendance Rectification</h1>
+      <p class="text-muted">Review and correct attendance records</p>
+    </div>
+    <div>
+      <a href="/admin/attendance/export" class="btn btn-outline-primary" target="_blank">
+        <i class="fas fa-download me-2"></i>Export All
+      </a>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card filter-card mb-4 animated">
+    <div class="card-body">
+      <form id="filter-form" class="row g-3" method="GET">
+        <div class="col-md-3">
+          <label class="form-label">Date From</label>
+          <input type="date" class="form-control" name="date_from" id="date_from">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Date To</label>
+          <input type="date" class="form-control" name="date_to" id="date_to">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Marked By</label>
+          <select class="form-select" name="marked_by" id="marked_by">
+            <option value="">All Teachers</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Search Student</label>
+          <input type="text" class="form-control" name="search" id="search" placeholder="Name, Roll, or UID">
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-filter me-1"></i>Apply Filters
+          </button>
+          <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
+            <i class="fas fa-times me-1"></i>Clear
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Stats Summary -->
+  <div class="row g-3 mb-4" id="stats-summary">
+    <div class="col-md-3">
+      <div class="card stat-card primary animated">
+        <div class="card-body text-center">
+          <i class="fas fa-list"></i>
+          <h3 id="total-records">-</h3>
+          <p>Total Records</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card success animated">
+        <div class="card-body text-center">
+          <i class="fas fa-users"></i>
+          <h3 id="unique-students">-</h3>
+          <p>Unique Students</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card info animated">
+        <div class="card-body text-center">
+          <i class="fas fa-chalkboard-teacher"></i>
+          <h3 id="unique-teachers">-</h3>
+          <p>Teachers</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card warning animated">
+        <div class="card-body text-center">
+          <i class="fas fa-edit"></i>
+          <h3 id="rectified-count">-</h3>
+          <p>Rectified</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance Table -->
+  <div class="card animated">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="fas fa-table me-2"></i>Attendance Records</span>
+      <span class="badge bg-primary" id="record-count">Loading...</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Student</th>
+              <th>Roll / UID</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Marked By</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="attendance-tbody">
+            <tr>
+              <td colspan="8" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Loading records...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card-footer">
+      <nav aria-label="Pagination">
+        <ul class="pagination pagination-sm mb-0 justify-content-center" id="pagination">
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">
+              <i class="fas fa-user-check me-2"></i>FaceAttendance
+            </h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking.</p>
+          </div>
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Rectify Modal -->
+    <div class="modal fade rectify-modal" id="rectifyModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-warning">
+            <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Rectify Attendance</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <form id="rectifyForm">
+            <div class="modal-body">
+              <input type="hidden" name="attendance_id" id="rectify_attendance_id">
+              <input type="hidden" name="action" id="rectify_action" value="update">
+              
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Current Record:</strong>
+                <div id="current-record-info"></div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label"><i class="fas fa-user me-1"></i>Marked By (Teacher)</label>
+                <select class="form-select" name="marked_by" id="rectify_marked_by">
+                  <option value="">Select Teacher</option>
+                </select>
+                <small class="text-muted">Leave empty to keep current</small>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label"><i class="fas fa-clock me-1"></i>Date & Time</label>
+                <input type="datetime-local" class="form-control" name="timestamp" id="rectify_timestamp">
+                <small class="text-muted">Leave empty to keep current</small>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label"><i class="fas fa-comment me-1"></i>Reason for Rectification <span class="text-danger">*</span></label>
+                <textarea class="form-control" name="reason" id="rectify_reason" rows="3" required placeholder="Explain why this attendance record is being corrected..."></textarea>
+              </div>
+
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" name="delete_instead" id="rectify_delete" onchange="toggleDeleteMode()">
+                <label class="form-check-label text-danger" for="rectify_delete">
+                  <i class="fas fa-trash me-1"></i> Delete this record instead of updating
+                </label>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-warning" id="rectify-submit-btn" name="save_changes" value="1">
+                <i class="fas fa-save me-2"></i>Save Changes
+              </button>
+              <button type="submit" class="btn btn-danger d-none" id="rectify-delete-btn" name="delete_record" value="1">
+                <i class="fas fa-trash me-2"></i>Delete Record
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Details Modal -->
+    <div class="modal fade" id="detailsModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h5 class="modal-title"><i class="fas fa-info-circle me-2"></i>Record Details</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" id="details-modal-body">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+
+    <script>
+    // Global state
+    let currentPage = 1;
+    let currentFilters = {};
+    let teachersList = [];
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', () => {
+      // Set default date range (last 30 days)
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      document.getElementById('date_to').valueAsDate = today;
+      document.getElementById('date_from').valueAsDate = thirtyDaysAgo;
+      
+      loadTeachers();
+      loadAttendance();
+    });
+
+    // Load teachers for dropdown
+    async function loadTeachers() {
+      try {
+        const response = await fetch('/api/teachers/list');
+        const data = await response.json();
+        if (data.teachers) {
+          teachersList = data.teachers;
+          const select = document.getElementById('marked_by');
+          const rectifySelect = document.getElementById('rectify_marked_by');
+          
+          teachersList.forEach(t => {
+            const option1 = new Option(`${t.username} (${t.teacher_id})`, t.id);
+            const option2 = new Option(`${t.username} (${t.teacher_id})`, t.id);
+            select.add(option1);
+            rectifySelect.add(option2);
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load teachers:', error);
+      }
+    }
+
+    // Load attendance records
+    async function loadAttendance(page = 1) {
+      currentPage = page;
+      const tbody = document.getElementById('attendance-tbody');
+      
+      // Build query params
+      const params = new URLSearchParams({
+        page: page,
+        per_page: 50
+      });
+      
+      const dateFrom = document.getElementById('date_from').value;
+      const dateTo = document.getElementById('date_to').value;
+      const markedBy = document.getElementById('marked_by').value;
+      const search = document.getElementById('search').value;
+      
+      if (dateFrom) params.append('date_from', dateFrom);
+      if (dateTo) params.append('date_to', dateTo);
+      if (markedBy) params.append('marked_by', markedBy);
+      if (search) params.append('search', search);
+      
+      currentFilters = Object.fromEntries(params);
+      
+      try {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Loading...</p></td></tr>';
+        
+        const response = await fetch(`/api/attendance/history?${params.toString()}`);
+        const data = await response.json();
+        
+        renderAttendanceTable(data);
+        renderPagination(data.pagination);
+      } catch (error) {
+        console.error('Failed to load attendance:', error);
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-danger">Failed to load records</td></tr>';
+      }
+    }
+
+    // Render attendance table
+    function renderAttendanceTable(data) {
+      const tbody = document.getElementById('attendance-tbody');
+      const countBadge = document.getElementById('record-count');
+      
+      if (data.records && data.records.length > 0) {
+        countBadge.textContent = `${data.pagination.total} records`;
+        
+        // Update stats
+        const uniqueStudents = new Set(data.records.map(r => r.student_id)).size;
+        const uniqueTeachers = new Set(data.records.map(r => r.marked_by_name).filter(Boolean)).size;
+        document.getElementById('total-records').textContent = data.pagination.total;
+        document.getElementById('unique-students').textContent = uniqueStudents;
+        document.getElementById('unique-teachers').textContent = uniqueTeachers;
+        
+        tbody.innerHTML = data.records.map((record, index) => `
+          <tr class="attendance-row" data-id="${record.id}">
+            <td>${(data.pagination.page - 1) * data.pagination.per_page + index + 1}</td>
+            <td>
+              <strong>${record.student_name}</strong>
+            </td>
+            <td>
+              <div>${record.student_roll}</div>
+              <small class="text-muted">${record.student_uid}</small>
+            </td>
+            <td>${record.date}</td>
+            <td>${record.time}</td>
+            <td>
+              ${record.marked_by_name ? `
+                <span class="badge bg-info">${record.marked_by_name}</span>
+              ` : `
+                <span class="badge bg-secondary">Self</span>
+              `}
+            </td>
+            <td>
+              <span class="badge bg-success"><i class="fas fa-check me-1"></i>Present</span>
+            </td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary" onclick="viewDetails(${JSON.stringify(record).replace(/"/g, '"')})" title="View Details">
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-outline-warning" onclick="openRectifyModal(${JSON.stringify(record).replace(/"/g, '"')})" title="Rectify">
+                  <i class="fas fa-edit"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+      } else {
+        countBadge.textContent = '0 records';
+        document.getElementById('total-records').textContent = '0';
+        document.getElementById('unique-students').textContent = '0';
+        document.getElementById('unique-teachers').textContent = '0';
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="text-center py-5">
+              <i class="fas fa-search fa-3x text-muted mb-3"></i>
+              <h5>No Records Found</h5>
+              <p class="text-muted">No attendance records match the current filters.</p>
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    // Render pagination
+    function renderPagination(pagination) {
+      const container = document.getElementById('pagination');
+      if (pagination.pages <= 1) {
+        container.innerHTML = '';
+        return;
+      }
+      
+      let html = '';
+      
+      // Previous
+      html += `
+        <li class="page-item ${!pagination.has_prev ? 'disabled' : ''}">
+          <a class="page-link" href="#" onclick="loadAttendance(${pagination.page - 1}); return false;" aria-label="Previous">
+            <i class="fas fa-chevron-left"></i>
+          </a>
+        </li>
+      `;
+      
+      // Page numbers
+      const start = Math.max(1, pagination.page - 2);
+      const end = Math.min(pagination.pages, pagination.page + 2);
+      
+      for (let i = start; i <= end; i++) {
+        html += `
+          <li class="page-item ${i === pagination.page ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="loadAttendance(${i}); return false;">${i}</a>
+          </li>
+        `;
+      }
+      
+      // Next
+      html += `
+        <li class="page-item ${!pagination.has_next ? 'disabled' : ''}">
+          <a class="page-link" href="#" onclick="loadAttendance(${pagination.page + 1}); return false;" aria-label="Next">
+            <i class="fas fa-chevron-right"></i>
+          </a>
+        </li>
+      `;
+      
+      container.innerHTML = html;
+    }
+
+    // Filter form submit
+    document.getElementById('filter-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      loadAttendance(1);
+    });
+
+    // Clear filters
+    function clearFilters() {
+      document.getElementById('filter-form').reset();
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      document.getElementById('date_to').valueAsDate = today;
+      document.getElementById('date_from').valueAsDate = thirtyDaysAgo;
+      loadAttendance(1);
+    }
+
+    // Open rectify modal
+    function openRectifyModal(record) {
+      document.getElementById('rectify_attendance_id').value = record.id;
+      document.getElementById('rectify_action').value = 'update';
+      document.getElementById('rectify_delete').checked = false;
+      toggleDeleteMode();
+      
+      // Show current record info
+      document.getElementById('current-record-info').innerHTML = `
+        <div class="row mt-2">
+          <div class="col-6"><strong>Student:</strong> ${record.student_name}</div>
+          <div class="col-6"><strong>Roll:</strong> ${record.student_roll}</div>
+          <div class="col-6"><strong>Date:</strong> ${record.date}</div>
+          <div class="col-6"><strong>Time:</strong> ${record.time}</div>
+          <div class="col-6"><strong>Marked By:</strong> ${record.marked_by_name || 'Self'}</div>
+        </div>
+      `;
+      
+      // Set current values
+      if (record.marked_by) {
+        document.getElementById('rectify_marked_by').value = record.marked_by;
+      } else {
+        document.getElementById('rectify_marked_by').value = '';
+      }
+      
+      // Set timestamp
+      const dt = new Date(record.timestamp.replace(' ', 'T'));
+      document.getElementById('rectify_timestamp').value = dt.toISOString().slice(0, 16);
+      
+      document.getElementById('rectify_reason').value = '';
+      
+      new bootstrap.Modal(document.getElementById('rectifyModal')).show();
+    }
+
+    // Toggle delete mode
+    function toggleDeleteMode() {
+      const isDelete = document.getElementById('rectify_delete').checked;
+      document.getElementById('rectify_action').value = isDelete ? 'delete' : 'update';
+      document.getElementById('rectify-submit-btn').classList.toggle('d-none', isDelete);
+      document.getElementById('rectify-delete-btn').classList.toggle('d-none', !isDelete);
+      document.getElementById('rectify_marked_by').disabled = isDelete;
+      document.getElementById('rectify_timestamp').disabled = isDelete;
+    }
+
+    // Handle rectify form submit
+    document.getElementById('rectifyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      
+      // Determine which button was clicked
+      const isDelete = formData.has('delete_record');
+      const isSave = formData.has('save_changes');
+      
+      if (!data.reason) {
+        showNotification('Reason is required', 'error');
+        return;
+      }
+      
+      const btn = document.getElementById(isDelete ? 'rectify-delete-btn' : 'rectify-submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+      
+      try {
+        const response = await fetch('/api/attendance/rectify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showNotification(result.message, 'success');
+          bootstrap.Modal.getInstance(document.getElementById('rectifyModal')).hide();
+          loadAttendance(currentPage);
+        } else {
+          showNotification(result.error || 'Rectification failed', 'error');
+        }
+      } catch (error) {
+        console.error('Rectification error:', error);
+        showNotification('Network error', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = isDelete ? '<i class="fas fa-trash me-2"></i>Delete Record' : '<i class="fas fa-save me-2"></i>Save Changes';
+      }
+    });
+
+    // View details modal
+    function viewDetails(record) {
+      const body = document.getElementById('details-modal-body');
+      body.innerHTML = `
+        <div class="row g-3">
+          <div class="col-6"><strong>Student:</strong></div>
+          <div class="col-6">${record.student_name}</div>
+          <div class="col-6"><strong>Roll Number:</strong></div>
+          <div class="col-6">${record.student_roll}</div>
+          <div class="col-6"><strong>UID:</strong></div>
+          <div class="col-6">${record.student_uid}</div>
+          <div class="col-6"><strong>Date:</strong></div>
+          <div class="col-6">${record.date}</div>
+          <div class="col-6"><strong>Time:</strong></div>
+          <div class="col-6">${record.time}</div>
+          <div class="col-6"><strong>Marked By:</strong></div>
+          <div class="col-6">${record.marked_by_name || 'Self (Student)'}</div>
+          <div class="col-6"><strong>Teacher ID:</strong></div>
+          <div class="col-6">${record.marked_by || 'N/A'}</div>
+          <div class="col-12"><strong>Record ID:</strong></div>
+          <div class="col-12 font-monospace small">${record.id}</div>
+        </div>
+      `;
+      new bootstrap.Modal(document.getElementById('detailsModal')).show();
+    }
+
+    // Show notification
+    function showNotification(message, type = 'info') {
+      const container = document.getElementById('flash-messages');
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+      alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      `;
+      container.appendChild(alert);
+      setTimeout(() => alert.remove(), 5000);
+    }
+    </script>
+  </body>
+</html>

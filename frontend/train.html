@@ -36,21 +36,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="fas fa-home me-1"></i> Home
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/login">
-                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/student-login">
-                <i class="fas fa-user-graduate me-1"></i> Student Login
-              </a>
-            </li>
+            {% include '_account_menu.html' %}
 
             <li class="nav-item">
               <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
@@ -78,13 +64,13 @@
           <div class="mb-4">
             <i class="fas fa-brain fa-5x mb-3" style="animation: pulse 2s infinite;"></i>
           </div>
-          <h2 class="fw-bold mb-2">Training Complete!</h2>
-          <p class="opacity-75 mb-4">Face recognition model has been successfully trained</p>
+          <h2 class="fw-bold mb-2">{% if error %}Training Failed{% else %}Training Complete!{% endif %}</h2>
+          <p class="opacity-75 mb-4">{% if error %}{{ error }}{% else %}Face recognition model has been successfully trained{% endif %}</p>
 
           <div class="bg-white bg-opacity-25 rounded-4 p-4 mb-4">
             <p class="mb-1 opacity-75">Total Face Encodings</p>
-            <h1 class="display-3 fw-bold mb-0">0</h1>
-            <p class="mb-0 mt-2 opacity-75">Students Marked as Trained: 0</p>
+            <h1 class="display-3 fw-bold mb-0">{{ total|default(0) }}</h1>
+            <p class="mb-0 mt-2 opacity-75">Students Marked as Trained: {{ trained_count|default(0) }}</p>
           </div>
 
           <div class="text-start bg-white bg-opacity-10 rounded-3 p-3 mb-4">
@@ -191,7 +177,7 @@
       triggerConfetti();
     }, 500);
 
-    showNotification('Model trained successfully!', 'success', 5000);
+    showNotification({% if error %}'Training failed. Check that the captured photos contain clear faces.'{% else %}'Model trained successfully!'{% endif %}, {% if error %}'error'{% else %}'success'{% endif %}, 5000);
   });
 </script>
   </body>

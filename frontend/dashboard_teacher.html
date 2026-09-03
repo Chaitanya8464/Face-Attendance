@@ -29,21 +29,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="fas fa-home me-1"></i> Home
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/login">
-                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/student-login">
-                <i class="fas fa-user-graduate me-1"></i> Student Login
-              </a>
-            </li>
+            {% include '_account_menu.html' %}
 
             <li class="nav-item">
               <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
@@ -76,7 +62,7 @@
     </div>
   </div>
 
-  <!-- Quick Actions -->
+<!-- Quick Actions -->
   <div class="row g-4 mb-4">
     <div class="col-md-4">
       <div class="card stat-card primary animated">
@@ -104,7 +90,17 @@
           <i class="fas fa-chart-pie"></i>
           <h3>View Stats</h3>
           <p>Attendance %</p>
-          <a href="/attendance-students" class="btn btn-light mt-2">View Stats</a>
+          <a href="/attendance/students" class="btn btn-light mt-2">View Stats</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card warning animated">
+        <div class="card-body text-center">
+          <i class="fas fa-history"></i>
+          <h3>Rectification</h3>
+          <p>My Requests</p>
+          <a href="/teacher/rectification/requests" class="btn btn-light mt-2">View Requests</a>
         </div>
       </div>
     </div>
@@ -140,7 +136,7 @@
             <li>View attendance percentage by student</li>
             <li>Search students by UID, name, or roll</li>
           </ul>
-          <a href="/attendance-students" class="btn btn-outline-primary">View Attendance</a>
+          <a href="/attendance/students" class="btn btn-outline-primary">View Attendance</a>
         </div>
       </div>
     </div>

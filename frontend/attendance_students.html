@@ -29,21 +29,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="fas fa-home me-1"></i> Home
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/login">
-                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/student-login">
-                <i class="fas fa-user-graduate me-1"></i> Student Login
-              </a>
-            </li>
+            {% include '_account_menu.html' %}
 
             <li class="nav-item">
               <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
@@ -82,7 +68,7 @@
   <!-- Search Bar -->
   <div class="card mb-4 animated">
     <div class="card-body">
-      <form method="GET" action="/attendance-students" class="row g-3">
+      <form method="GET" action="/attendance/students" class="row g-3">
         <div class="col-md-9">
           <div class="input-group">
             <span class="input-group-text">
@@ -98,7 +84,7 @@
             <button type="submit" class="btn btn-primary flex-fill">
               <i class="fas fa-search me-1"></i>Search
             </button>
-            <a href="/attendance-students" class="btn btn-outline-secondary">
+            <a href="/attendance/students" class="btn btn-outline-secondary">
               <i class="fas fa-times"></i>
             </a>
           </div>
@@ -113,7 +99,7 @@
       <div class="card stat-card primary animated">
         <div class="card-body text-center">
           <i class="fas fa-users"></i>
-          <h3>0</h3>
+          <h3>{{ student_attendance|length }}</h3>
           <p>Total Students</p>
         </div>
       </div>
@@ -122,7 +108,7 @@
       <div class="card stat-card success animated">
         <div class="card-body text-center">
           <i class="fas fa-check-circle"></i>
-          <h3>0</h3>
+          <h3>{{ student_attendance|selectattr('marked_today')|list|length }}</h3>
           <p>Present Today</p>
         </div>
       </div>
@@ -131,7 +117,7 @@
       <div class="card stat-card info animated">
         <div class="card-body text-center">
           <i class="fas fa-user-slash"></i>
-          <h3>0</h3>
+          <h3>{{ student_attendance|rejectattr('marked_today')|list|length }}</h3>
           <p>Absent Today</p>
         </div>
       </div>
@@ -142,7 +128,7 @@
   <div class="card animated">
     <div class="card-header d-flex justify-content-between align-items-center">
       <span><i class="fas fa-list me-2"></i>Attendance Overview</span>
-      <span class="badge bg-primary">0 Students</span>
+      <span class="badge bg-primary">{{ student_attendance|length }} Students</span>
     </div>
     <div class="card-body">
       <div class="table-responsive">
@@ -161,20 +147,58 @@
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td colspan="9" class="text-center text-muted py-4">
-                <i class="fas fa-clipboard-list fa-3x mb-3"></i>
-                <h5>No Attendance Records Yet</h5>
-                <p class="mb-3">You haven't marked attendance for any students yet.</p>
-                <a href="/attendance" class="btn btn-primary">
-                  <i class="fas fa-camera me-2"></i>Mark Attendance Now
-                </a>
-                <p class="mt-3 small text-muted">
-                  <i class="fas fa-info-circle me-1"></i>
-                  Once you mark attendance, students will appear here.
-                </p>
-              </td>
-            </tr>
+            {% if student_attendance %}
+              {% for item in student_attendance %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ item.student.name }}</td>
+                <td>{{ item.student.roll }}</td>
+                <td>{{ item.student.uid }}</td>
+                <td>{{ item.total_attendance }}</td>
+                <td>
+                  <span class="badge 
+                    {% if item.attendance_percentage >= 75 %}bg-success
+                    {% elif item.attendance_percentage >= 50 %}bg-warning
+                    {% else %}bg-danger{% endif %}">
+                    {{ item.attendance_percentage }}%
+                  </span>
+                </td>
+                <td>
+                  {% if item.marked_today %}
+                    <span class="badge bg-success"><i class="fas fa-check me-1"></i>Yes</span>
+                  {% else %}
+                    <span class="badge bg-secondary"><i class="fas fa-times me-1"></i>No</span>
+                  {% endif %}
+                </td>
+                <td>{{ item.marked_by_name or 'N/A' }}</td>
+                <td>
+                  <button type="button" class="btn btn-sm btn-outline-primary" onclick="showAttendanceDetails('{{ item.student.name }}', {{ item.total_attendance }}, {{ item.attendance_percentage }})">
+                    <i class="fas fa-chart-bar"></i>
+                  </button>
+                  {% if item.marked_by_name and item.marked_by_name == current_user.username %}
+                  <button type="button" class="btn btn-sm btn-outline-warning ms-1" onclick="openRectifyRequestModal('{{ item.student.id }}', '{{ item.student.name }}', '{{ item.student.roll }}', '{{ item.student.uid }}', '')" title="Request Rectification">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="9" class="text-center text-muted py-4">
+                  <i class="fas fa-clipboard-list fa-3x mb-3"></i>
+                  <h5>No Attendance Records Yet</h5>
+                  <p class="mb-3">You haven't marked attendance for any students yet.</p>
+                  <a href="/attendance" class="btn btn-primary">
+                    <i class="fas fa-camera me-2"></i>Mark Attendance Now
+                  </a>
+                  <p class="mt-3 small text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Once you mark attendance, students will appear here.
+                  </p>
+                </td>
+              </tr>
+            {% endif %}
           </tbody>
         </table>
       </div>
@@ -264,7 +288,172 @@ function showAttendanceDetails(name, total, percentage) {
 
   new bootstrap.Modal(document.getElementById('attendanceModal')).show();
 }
+
+// Rectification Request Modal Functions
+let rectifyRequestStudentId = null;
+
+function openRectifyRequestModal(studentId, studentName, studentRoll, studentUid, attendanceId) {
+  rectifyRequestStudentId = studentId;
+  
+  document.getElementById('rectify_student_info').innerHTML = `
+    <div class="row g-2">
+      <div class="col-6"><strong>Student:</strong></div>
+      <div class="col-6">${studentName}</div>
+      <div class="col-6"><strong>Roll:</strong></div>
+      <div class="col-6">${studentRoll}</div>
+      <div class="col-6"><strong>UID:</strong></div>
+      <div class="col-6">${studentUid}</div>
+    </div>
+  `;
+  
+  // Load available teachers for reassignment
+  loadTeachersForRectify();
+  
+  // Clear form
+  document.getElementById('rectify_attendance_id').value = attendanceId || '';
+  document.getElementById('rectify_reason').value = '';
+  document.getElementById('rectify_requested_marked_by').value = '';
+  document.getElementById('rectify_requested_timestamp').value = '';
+  
+  new bootstrap.Modal(document.getElementById('rectifyRequestModal')).show();
+}
+
+async function loadTeachersForRectify() {
+  try {
+    const response = await fetch('/api/teachers/list');
+    const data = await response.json();
+    const select = document.getElementById('rectify_requested_marked_by');
+    select.innerHTML = '<option value="">No change (keep current teacher)</option>';
+    
+    if (data.teachers) {
+      data.teachers.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t.id;
+        option.textContent = `${t.username} (${t.teacher_id})`;
+        select.appendChild(option);
+      });
+    }
+  } catch (error) {
+    console.error('Failed to load teachers:', error);
+  }
+}
+
+async function submitRectifyRequest() {
+  const reason = document.getElementById('rectify_reason').value.trim();
+  const requestedMarkedBy = document.getElementById('rectify_requested_marked_by').value;
+  const requestedTimestamp = document.getElementById('rectify_requested_timestamp').value;
+  
+  if (!reason) {
+    showNotification('Reason is required', 'error');
+    return;
+  }
+  
+  // Get today's attendance record for this student marked by current teacher
+  try {
+    const response = await fetch('/api/attendance/today-by-student/' + rectifyRequestStudentId);
+    const data = await response.json();
+    
+    if (!data.attendance) {
+      showNotification('No attendance record found for today', 'error');
+      return;
+    }
+    
+    const btn = document.getElementById('rectify-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Submitting...';
+    
+    const requestData = {
+      attendance_id: data.attendance.id,
+      reason: reason
+    };
+    
+    if (requestedMarkedBy) {
+      requestData.requested_marked_by = parseInt(requestedMarkedBy);
+    }
+    if (requestedTimestamp) {
+      requestData.requested_timestamp = requestedTimestamp;
+    }
+    
+    const response2 = await fetch('/api/rectification/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestData)
+    });
+    
+    const result = await response2.json();
+    
+    if (result.success) {
+      showNotification(result.message, 'success');
+      bootstrap.Modal.getInstance(document.getElementById('rectifyRequestModal')).hide();
+    } else {
+      showNotification(result.error || 'Failed to submit request', 'error');
+    }
+  } catch (error) {
+    console.error('Submit error:', error);
+    showNotification('Network error', 'error');
+  } finally {
+    const btn = document.getElementById('rectify-submit-btn');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Submit Request';
+  }
+}
+
+function showNotification(message, type = 'info') {
+  const container = document.getElementById('flash-messages');
+  const alert = document.createElement('div');
+  alert.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+  alert.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+  container.appendChild(alert);
+  setTimeout(() => alert.remove(), 5000);
+}
 </script>
+
+<!-- Rectify Request Modal -->
+<div class="modal fade" id="rectifyRequestModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Request Rectification</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="rectifyRequestForm">
+        <div class="modal-body">
+          <input type="hidden" name="attendance_id" id="rectify_attendance_id">
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Student:</strong>
+            <div id="rectify_student_info"></div>
+          </div>
+        
+        <div class="mb-3">
+          <label class="form-label"><i class="fas fa-user me-1"></i>Reassign to Teacher (Optional)</label>
+          <select class="form-select" id="rectify_requested_marked_by">
+            <option value="">No change (keep current teacher)</option>
+          </select>
+          <small class="text-muted">Select a different teacher if the wrong teacher marked attendance</small>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label"><i class="fas fa-clock me-1"></i>Correct Timestamp (Optional)</label>
+          <input type="datetime-local" class="form-control" id="rectify_requested_timestamp">
+          <small class="text-muted">Adjust the time if it was recorded incorrectly</small>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label"><i class="fas fa-comment me-1"></i>Reason for Rectification <span class="text-danger">*</span></label>
+          <textarea class="form-control" id="rectify_reason" rows="3" required placeholder="Explain why this attendance record needs correction..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning" id="rectify-submit-btn" onclick="submitRectifyRequest()">
+          <i class="fas fa-paper-plane me-2"></i>Submit Request
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
     </main>
 
     <!-- Footer -->

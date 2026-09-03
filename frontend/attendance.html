@@ -36,21 +36,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="fas fa-home me-1"></i> Home
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/login">
-                <i class="fas fa-sign-in-alt me-1"></i> Staff Login
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="/student-login">
-                <i class="fas fa-user-graduate me-1"></i> Student Login
-              </a>
-            </li>
+            {% include '_account_menu.html' %}
 
             <li class="nav-item">
               <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
@@ -166,6 +152,13 @@
 
               <div id="detected-list" class="list-group list-group-flush">
                 <!-- Detected students will appear here -->
+              </div>
+
+              <!-- Unrecognized faces alert -->
+              <div id="unrecognized-alert" class="alert alert-warning mt-3 d-none">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Unregistered person detected!</strong>
+                <p class="mb-0 mt-1 small">The system detected <span id="unrecognized-count">0</span> face(s) that are not registered in the system.</p>
               </div>
             </div>
 
@@ -398,6 +391,17 @@
             }
           }
         });
+      }
+
+      // Handle unrecognized faces
+      if (data.unrecognized && data.unrecognized.length > 0) {
+        const unrecognizedAlert = document.getElementById('unrecognized-alert');
+        const unrecognizedCount = document.getElementById('unrecognized-count');
+        unrecognizedCount.textContent = data.unrecognized.length;
+        unrecognizedAlert.classList.remove('d-none');
+        
+        // Show warning notification (only once per session or limit)
+        showNotification(`Warning: ${data.unrecognized.length} unregistered person(s) detected!`, 'warning');
       }
 
     } catch (error) {
