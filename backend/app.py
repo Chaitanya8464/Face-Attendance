@@ -180,8 +180,8 @@ def student_dashboard():
         flash('Student not found.', 'error')
         return redirect(url_for('student_login'))
 
-    # Get student's attendance records
-    attendance_records = Attendance.query.filter_by(student_id=student_id)\
+    # Get student's attendance records (only 'present' status)
+    attendance_records = Attendance.query.filter_by(student_id=student_id, status='present')\
                                         .order_by(Attendance.timestamp.desc())\
                                         .limit(100).all()
 
@@ -190,13 +190,17 @@ def student_dashboard():
     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     today_attendance = Attendance.query.filter(
         Attendance.student_id == student_id,
-        Attendance.timestamp >= today_start
+        Attendance.timestamp >= today_start,
+        Attendance.status == 'present'
     ).first()
 
-    # Calculate attendance percentage
+    # Calculate attendance percentage (only 'present' status)
     total_attendance_days = db.session.query(db.func.count(db.func.distinct(
         db.func.date(Attendance.timestamp)
-    ))).filter_by(student_id=student_id).scalar() or 0
+    ))).filter_by(
+        student_id=student_id,
+        status='present'
+    ).scalar() or 0
     days_in_period = 30
     attendance_percentage = (total_attendance_days / days_in_period * 100) if days_in_period > 0 else 0
     attendance_percentage = min(100, attendance_percentage)
@@ -238,23 +242,27 @@ def student_attendance_history():
         flash('Student not found.', 'error')
         return redirect(url_for('student_login'))
 
-    # Get all attendance records for this student
+    # Get all attendance records for this student (show all including rectified)
     attendance_records = Attendance.query.filter_by(student_id=student_id)\
                                         .order_by(Attendance.timestamp.desc())\
                                         .all()
 
-    # Calculate stats
-    total_attendance = len(attendance_records)
+    # Calculate stats (only 'present' status)
+    total_attendance = Attendance.query.filter_by(student_id=student_id, status='present').count()
     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     today_attendance = Attendance.query.filter(
         Attendance.student_id == student_id,
-        Attendance.timestamp >= today_start
+        Attendance.timestamp >= today_start,
+        Attendance.status == 'present'
     ).first()
 
-    # Calculate attendance percentage
+    # Calculate attendance percentage (only 'present' status)
     total_attendance_days = db.session.query(db.func.count(db.func.distinct(
         db.func.date(Attendance.timestamp)
-    ))).filter_by(student_id=student_id).scalar() or 0
+    ))).filter_by(
+        student_id=student_id,
+        status='present'
+    ).scalar() or 0
     days_in_period = 30
     attendance_percentage = (total_attendance_days / days_in_period * 100) if days_in_period > 0 else 0
     attendance_percentage = min(100, attendance_percentage)
@@ -889,11 +897,12 @@ def api_start_recognize():
             if roll and roll != 'Unknown':
                 student = Student.query.filter_by(roll=roll).first()
                 if student:
-                    # Prevent duplicate attendance for same day
+                    # Prevent duplicate attendance for same day (only 'present' status)
                     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
                     existing_att = Attendance.query.filter(
                         Attendance.student_id == student.id,
-                        Attendance.timestamp >= today_start
+                        Attendance.timestamp >= today_start,
+                        Attendance.status == 'present'
                     ).first()
 
                     if not existing_att:
@@ -905,6 +914,14 @@ def api_start_recognize():
                         db.session.add(att)
                         db.session.commit()
                         marked.append({'roll': student.roll, 'name': student.name})
+                        
+                        # Send notification to student
+                        try:
+                            if student.email:
+                                from email_utils import send_attendance_notification
+                                send_attendance_notification(student, marked_by_name or 'Self', datetime.now())
+                        except Exception as e:
+                            print(f"Failed to send student notification: {e}")
 
         return jsonify({'marked': marked}), 200
 
@@ -924,14 +941,15 @@ def check_and_send_low_attendance_alert(student, threshold=75):
     from datetime import datetime, timedelta
     from sqlalchemy import func
     
-    # Calculate attendance for last 30 days
+    # Calculate attendance for last 30 days (only 'present' status)
     thirty_days_ago = datetime.now() - timedelta(days=30)
     
     total_days = db.session.query(func.count(func.distinct(
         func.date(Attendance.timestamp)
     ))).filter(
         Attendance.student_id == student.id,
-        Attendance.timestamp >= thirty_days_ago
+        Attendance.timestamp >= thirty_days_ago,
+        Attendance.status == 'present'
     ).scalar() or 0
     
     # 30 days = ~22 working days (assuming 5 days/week)
@@ -978,14 +996,6 @@ def check_and_send_low_attendance_alert(student, threshold=75):
 # -----------------------
 @app.route('/api/recognize_attendance', methods=['POST'])
 def api_recognize_attendance():
-    """
-    Receives a base64 image from the client, recognizes faces, and marks attendance.
-
-    This is the main attendance endpoint used by the browser camera.
-    Only trained students can mark attendance.
-    Prevents duplicate entries for the same student on the same day.
-    Tracks which teacher/admin marked the attendance.
-    """
     try:
         session_student_id = session.get('student_id')
         linked_student_id = None
@@ -1003,7 +1013,6 @@ def api_recognize_attendance():
         if not image_b64:
             return jsonify({'error': 'No image provided'}), 400
 
-        # Decode base64
         if ',' in image_b64:
             image_b64 = image_b64.split(',', 1)[1]
         image_data = base64.b64decode(image_b64)
@@ -1014,7 +1023,6 @@ def api_recognize_attendance():
         recognized = []
         unrecognized = []
 
-        # Get current user if logged in (teacher/admin)
         marked_by_user_id = None
         marked_by_name = None
         if current_user.is_authenticated:
@@ -1027,34 +1035,24 @@ def api_recognize_attendance():
             if roll and roll != 'Unknown':
                 student = Student.query.filter_by(roll=roll).first()
                 if student:
-                    # A student session can only mark the logged-in student's
-                    # attendance. Staff sessions may mark any recognized student.
                     if allowed_student_id and student.id != allowed_student_id:
                         continue
-
-                    # Only allow trained students to mark attendance
                     if not student.is_trained:
-                        continue  # Skip untrained students
-
-                    # Prevent duplicate attendance for same day
+                        continue 
                     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                    
-                    # For students: prevent any duplicate for the day
-                    # For teachers/admins: prevent duplicate only for this teacher (they can mark even if another teacher already did)
                     if allowed_student_id:
-                        # Student marking their own attendance - global duplicate check
-                        existing_att = Attendance.query.filter(
-                            Attendance.student_id == student.id,
-                            Attendance.timestamp >= today_start
-                        ).first()
-                    else:
-                        # Teacher/admin marking attendance - per-teacher duplicate check
                         existing_att = Attendance.query.filter(
                             Attendance.student_id == student.id,
                             Attendance.timestamp >= today_start,
-                            Attendance.marked_by == marked_by_user_id
+                            Attendance.status == 'present'
                         ).first()
-
+                    else:
+                        existing_att = Attendance.query.filter(
+                            Attendance.student_id == student.id,
+                            Attendance.timestamp >= today_start,
+                            Attendance.marked_by == marked_by_user_id,
+                            Attendance.status == 'present'
+                        ).first()
                     if not existing_att:
                         att = Attendance(
                             student_id=student.id,
@@ -1063,17 +1061,11 @@ def api_recognize_attendance():
                         )
                         db.session.add(att)
                         db.session.commit()
-
-                        # Send notifications
-                        marked_at = datetime.now()
-                        
-                        # 1. Send email to student
+                        marked_at = datetime.now() 
                         try:
                             send_attendance_notification(student, marked_by_name or 'Self', marked_at)
                         except Exception as e:
                             print(f"Failed to send student notification: {e}")
-                        
-                        # 2. Create in-app notification for admins
                         try:
                             admins = User.query.filter_by(role='admin').all()
                             for admin in admins:
@@ -1157,7 +1149,7 @@ def api_get_notifications():
             .order_by(Notification.created_at.desc())\
             .limit(50).all()
     else:
-        # Get students this teacher has marked attendance for
+        
         marked_student_ids = db.session.query(
             Attendance.student_id
         ).filter_by(
@@ -1192,9 +1184,9 @@ def api_mark_notification_read(notif_id):
     """Mark notification as read"""
     notification = Notification.query.get_or_404(notif_id)
     
-    # Check permission
+
     if not current_user.is_admin() and notification.student_id:
-        # Check if teacher marked this student
+       
         marked = Attendance.query.filter_by(
             student_id=notification.student_id,
             marked_by_name=current_user.username
@@ -1371,6 +1363,79 @@ def api_rectify_attendance():
 
 
 # -----------------------
+# API: Attendance History (Admin/Teacher)
+# -----------------------
+@app.route('/api/attendance/history', methods=['GET'])
+@teacher_required
+def api_attendance_history():
+    """Get all attendance records with pagination and filters"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        student_id = request.args.get('student_id', type=int)
+        date_from = request.args.get('date_from')
+        date_to = request.args.get('date_to')
+        marked_by = request.args.get('marked_by')
+        status = request.args.get('status')  # present, absent, rectified
+        
+        query = Attendance.query.join(Student).order_by(Attendance.timestamp.desc())
+        
+        if student_id:
+            query = query.filter(Attendance.student_id == student_id)
+        
+        if date_from:
+            try:
+                query = query.filter(Attendance.timestamp >= datetime.fromisoformat(date_from))
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                query = query.filter(Attendance.timestamp <= datetime.fromisoformat(date_to))
+            except ValueError:
+                pass
+        
+        if marked_by:
+            query = query.filter(Attendance.marked_by_name == marked_by)
+            
+        if status:
+            query = query.filter(Attendance.status == status)
+        
+        # For teachers, only show records they marked
+        if not current_user.is_admin():
+            query = query.filter(Attendance.marked_by_name == current_user.username)
+        
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return jsonify({
+            'records': [{
+                'id': a.id,
+                'student_id': a.student_id,
+                'student_name': a.student.name,
+                'student_roll': a.student.roll,
+                'student_uid': a.student.uid,
+                'marked_by': a.marked_by,
+                'marked_by_name': a.marked_by_name,
+                'timestamp': a.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'date': a.timestamp.strftime('%Y-%m-%d'),
+                'time': a.timestamp.strftime('%H:%M:%S'),
+                'status': a.status
+            } for a in pagination.items],
+            'pagination': {
+                'page': pagination.page,
+                'per_page': pagination.per_page,
+                'total': pagination.total,
+                'pages': pagination.pages,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        })
+    except Exception as e:
+        print(f"[ERROR] Get attendance history failed: {e}")
+        return jsonify({'error': 'Failed to fetch attendance history'}), 500
+
+
+# -----------------------
 # API: Direct Attendance Rectification (Admin only)
 # -----------------------
 @app.route('/api/attendance/rectify', methods=['POST'])
@@ -1423,6 +1488,29 @@ def api_rectify_attendance():
                     message=f'Attendance for {student.name} ({student.roll}) on {timestamp.strftime("%Y-%m-%d %H:%M:%S")} was deleted by {current_user.username}. Reason: {reason}'
                 )
             
+            # Notify student
+            try:
+                if student.email:
+                    from email_utils import send_email
+                    subject = f'Attendance Removed: {student.name}'
+                    text_body = f'''
+Hello {student.name},
+
+Your attendance record has been removed by {current_user.username}.
+
+Details:
+- Student: {student.name} ({student.roll})
+- Original time: {timestamp.strftime("%Y-%m-%d %H:%M:%S")}
+- Reason: {reason}
+
+If you believe this is an error, please contact your teacher or admin.
+
+Face Attendance System
+'''
+                    send_email(subject, [student.email], text_body, text_body)
+            except Exception as e:
+                print(f"Failed to notify student: {e}")
+            
             db.session.delete(attendance)
             db.session.commit()
             
@@ -1469,6 +1557,30 @@ def api_rectify_attendance():
                     title=f'Attendance Rectified: {student.name}',
                     message=f'Attendance for {student.name} ({student.roll}) rectified by {current_user.username}. Changes: {"; ".join(changes)}. Reason: {reason}'
                 )
+            
+            # Notify student
+            try:
+                if student.email:
+                    from email_utils import send_email
+                    subject = f'Attendance Updated: {student.name}'
+                    changes_text = "; ".join(changes) if changes else "No changes"
+                    text_body = f'''
+Hello {student.name},
+
+Your attendance record has been updated by {current_user.username}.
+
+Details:
+- Student: {student.name} ({student.roll})
+- Changes: {changes_text}
+- Reason: {reason}
+
+If you believe this is an error, please contact your teacher or admin.
+
+Face Attendance System
+'''
+                    send_email(subject, [student.email], text_body, text_body)
+            except Exception as e:
+                print(f"Failed to notify student: {e}")
             
             return jsonify({
                 'success': True,
@@ -1635,7 +1747,8 @@ def api_get_pending_rectifications():
         per_page = request.args.get('per_page', 20, type=int)
         status = request.args.get('status', 'pending')
         
-        query = RectificationRequest.query.join(Attendance).join(Student).join(User, RectificationRequest.teacher_id == User.id)\
+        # Use LEFT JOIN for Attendance since it may be deleted when request is approved
+        query = RectificationRequest.query.outerjoin(Attendance).join(Student).join(User, RectificationRequest.teacher_id == User.id)\
             .order_by(RectificationRequest.created_at.desc())
         
         if status != 'all':
@@ -1652,8 +1765,8 @@ def api_get_pending_rectifications():
                 'student_uid': r.student.uid,
                 'teacher_name': r.teacher.username,
                 'teacher_id': r.teacher.teacher_id,
-                'current_marked_by': r.attendance.marked_by_name,
-                'current_timestamp': r.attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'current_marked_by': r.attendance.marked_by_name if r.attendance else 'N/A (deleted)',
+                'current_timestamp': r.attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S') if r.attendance else 'N/A',
                 'requested_marked_by': r.new_marked_by.username if r.new_marked_by else None,
                 'requested_marked_by_id': r.requested_marked_by,
                 'requested_timestamp': r.requested_timestamp.strftime('%Y-%m-%d %H:%M:%S') if r.requested_timestamp else None,
@@ -1715,16 +1828,16 @@ def api_review_rectification_request():
         teacher = rect_request.teacher
         
         if action == 'approve':
-            # Approve = mark attendance as absent (delete the attendance record)
+            # Approve = mark attendance as rectified (absent) - keep record for history
             student = rect_request.student
             teacher = rect_request.teacher
             
-            # Store attendance info for notification before deletion
+            # Store attendance info for notification before update
             attendance_info = f"{attendance.student.name} ({attendance.student.roll}) on {attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
             marked_by = attendance.marked_by_name
             
-            # Delete the attendance record (mark as absent)
-            db.session.delete(attendance)
+            # Mark attendance as rectified instead of deleting (keeps history)
+            attendance.status = 'rectified'
             db.session.commit()
             
             # Update request status
@@ -1754,16 +1867,16 @@ def api_review_rectification_request():
                         user_id=admin.id,
                         student_id=student.id,
                         notif_type='attendance_rectified',
-                        title=f'Attendance Marked Absent: {student.name}',
-                        message=f'Request from {teacher.username} approved by {current_user.username}. Attendance record for {attendance_info} marked as absent (deleted). Reason: {rect_request.reason}'
+                        title=f'Attendance Rectified: {student.name}',
+                        message=f'Request from {teacher.username} approved by {current_user.username}. Attendance record for {attendance_info} marked as rectified (absent). Reason: {rect_request.reason}'
                     )
             except Exception as e:
                 print(f"Failed to notify admins: {e}")
             
             return jsonify({
                 'success': True,
-                'message': 'Request approved - attendance marked as absent (record deleted)',
-                'action': 'deleted'
+                'message': 'Request approved - attendance marked as rectified (absent)',
+                'action': 'rectified'
             })
         
         else:  # reject
@@ -1786,6 +1899,31 @@ def api_review_rectification_request():
                     title=f'Rectification Rejected: {student.name}',
                     message=f'Request from {teacher.username} rejected by {current_user.username}. Reason: {rect_request.reason}. Admin notes: {admin_notes}'
                 )
+            
+            # Notify student
+            try:
+                if student.email:
+                    from email_utils import send_email
+                    subject = f'Rectification Request Rejected: {student.name}'
+                    text_body = f'''
+Hello {student.name},
+
+Your attendance rectification request has been rejected by {current_user.username}.
+
+Details:
+- Student: {student.name} ({student.roll})
+- Your reason: {rect_request.reason}
+- Admin notes: {admin_notes or 'None'}
+
+The attendance record remains unchanged.
+
+If you have questions, please contact your teacher or admin.
+
+Face Attendance System
+'''
+                    send_email(subject, [student.email], text_body, text_body)
+            except Exception as e:
+                print(f"Failed to notify student: {e}")
             
             return jsonify({
                 'success': True,
@@ -1991,7 +2129,10 @@ def attendance_report():
     days = request.args.get('days', 7, type=int)
     date_from = datetime.now() - timedelta(days=days)
 
-    records = Attendance.query.filter(Attendance.timestamp >= date_from).all()
+    records = Attendance.query.filter(
+        Attendance.timestamp >= date_from,
+        Attendance.status == 'present'
+    ).all()
 
     # Group by date
     report = {}
@@ -2067,30 +2208,36 @@ def attendance_students():
         # For teachers, only count attendance marked by them
         # Admins can see all attendance
         if is_admin:
-            # Admin sees all attendance
-            total_attendance = db.session.query(db.func.count(db.func.distinct(
-                db.func.date(Attendance.timestamp)
-            ))).filter_by(student_id=student.id).scalar() or 0
-            
-            # Get today's attendance with marked_by info
-            today_attendance = Attendance.query.filter(
-                Attendance.student_id == student.id,
-                Attendance.timestamp >= today_start
-            ).first()
-        else:
-            # Teacher only sees attendance they marked
+            # Admin sees all attendance (only 'present' status)
             total_attendance = db.session.query(db.func.count(db.func.distinct(
                 db.func.date(Attendance.timestamp)
             ))).filter_by(
                 student_id=student.id,
-                marked_by_name=current_user.username
+                status='present'
+            ).scalar() or 0
+            
+            # Get today's attendance with marked_by info
+            today_attendance = Attendance.query.filter(
+                Attendance.student_id == student.id,
+                Attendance.timestamp >= today_start,
+                Attendance.status == 'present'
+            ).first()
+        else:
+            # Teacher only sees attendance they marked (only 'present' status)
+            total_attendance = db.session.query(db.func.count(db.func.distinct(
+                db.func.date(Attendance.timestamp)
+            ))).filter_by(
+                student_id=student.id,
+                marked_by_name=current_user.username,
+                status='present'
             ).scalar() or 0
             
             # Get today's attendance marked by this teacher
             today_attendance = Attendance.query.filter(
                 Attendance.student_id == student.id,
                 Attendance.timestamp >= today_start,
-                Attendance.marked_by_name == current_user.username
+                Attendance.marked_by_name == current_user.username,
+                Attendance.status == 'present'
             ).first()
         
         # Calculate percentage (based on last 30 days or total working days)

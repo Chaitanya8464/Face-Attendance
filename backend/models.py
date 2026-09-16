@@ -212,6 +212,7 @@ class Attendance(db.Model):
         timestamp: When attendance was marked (auto-set to now)
         marked_by: User ID of teacher/admin who marked attendance (nullable for self-marked)
         marked_by_name: Name of teacher/admin who marked attendance
+        status: Attendance status (present, absent, rectified)
 
     NOTE: Using datetime.now (not utcnow) to store local time.
           This might cause issues with DST - consider using timezone-aware datetimes.
@@ -222,9 +223,10 @@ class Attendance(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.now)
     marked_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # User who marked attendance
     marked_by_name = db.Column(db.String(100), nullable=True)  # Name of user who marked attendance
+    status = db.Column(db.String(20), nullable=False, default='present')  # present, absent, rectified
 
     def __repr__(self):
-        return f"Attendance('{self.student_id}', '{self.timestamp}')"
+        return f"Attendance('{self.student_id}', '{self.timestamp}', '{self.status}')"
 
 
 class Notification(db.Model):

@@ -96,6 +96,15 @@
           </select>
         </div>
         <div class="col-md-3">
+          <label class="form-label">Status</label>
+          <select class="form-select" name="status" id="status_filter">
+            <option value="">All Statuses</option>
+            <option value="present">Present</option>
+            <option value="absent">Absent</option>
+            <option value="rectified">Rectified</option>
+          </select>
+        </div>
+        <div class="col-md-3">
           <label class="form-label">Search Student</label>
           <input type="text" class="form-control" name="search" id="search" placeholder="Name, Roll, or UID">
         </div>
@@ -362,11 +371,13 @@
       const dateTo = document.getElementById('date_to').value;
       const markedBy = document.getElementById('marked_by').value;
       const search = document.getElementById('search').value;
+      const statusFilter = document.getElementById('status_filter').value;
       
       if (dateFrom) params.append('date_from', dateFrom);
       if (dateTo) params.append('date_to', dateTo);
       if (markedBy) params.append('marked_by', markedBy);
       if (search) params.append('search', search);
+      if (statusFilter) params.append('status', statusFilter);
       
       currentFilters = Object.fromEntries(params);
       
@@ -395,9 +406,11 @@
         // Update stats
         const uniqueStudents = new Set(data.records.map(r => r.student_id)).size;
         const uniqueTeachers = new Set(data.records.map(r => r.marked_by_name).filter(Boolean)).size;
+        const rectifiedCount = data.records.filter(r => r.status === 'rectified').length;
         document.getElementById('total-records').textContent = data.pagination.total;
         document.getElementById('unique-students').textContent = uniqueStudents;
         document.getElementById('unique-teachers').textContent = uniqueTeachers;
+        document.getElementById('rectified-count').textContent = rectifiedCount;
         
         tbody.innerHTML = data.records.map((record, index) => `
           <tr class="attendance-row" data-id="${record.id}">
@@ -419,14 +432,14 @@
               `}
             </td>
             <td>
-              <span class="badge bg-success"><i class="fas fa-check me-1"></i>Present</span>
+              ${getStatusBadge(record.status || 'present')}
             </td>
             <td>
               <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-primary" onclick="viewDetails(${JSON.stringify(record).replace(/"/g, '"')})" title="View Details">
+                <button class="btn btn-outline-primary" onclick='viewDetails(${JSON.stringify(record).replace(/'/g, "\\'")})' title="View Details">
                   <i class="fas fa-eye"></i>
                 </button>
-                <button class="btn btn-outline-warning" onclick="openRectifyModal(${JSON.stringify(record).replace(/"/g, '"')})" title="Rectify">
+                <button class="btn btn-outline-warning" onclick='openRectifyModal(${JSON.stringify(record).replace(/'/g, "\\'")})' title="Rectify">
                   <i class="fas fa-edit"></i>
                 </button>
               </div>
@@ -491,6 +504,19 @@
       `;
       
       container.innerHTML = html;
+    }
+
+    // Status badge helper
+    function getStatusBadge(status) {
+      switch (status) {
+        case 'rectified':
+          return '<span class="badge bg-warning"><i class="fas fa-edit me-1"></i>Rectified</span>';
+        case 'absent':
+          return '<span class="badge bg-danger"><i class="fas fa-times me-1"></i>Absent</span>';
+        case 'present':
+        default:
+          return '<span class="badge bg-success"><i class="fas fa-check me-1"></i>Present</span>';
+      }
     }
 
     // Filter form submit

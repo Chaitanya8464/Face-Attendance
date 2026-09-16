@@ -102,7 +102,7 @@
     </div>
   </div>
 
-  <!-- Attendance History Table -->
+<!-- Attendance History Table -->
   <div class="card animated">
     <div class="card-header d-flex justify-content-between align-items-center">
       <span><i class="fas fa-list me-2"></i>Complete Attendance History</span>
@@ -113,7 +113,7 @@
       <div class="table-responsive">
         <table class="table table-hover mb-0">
           <thead>
-            <tr><th>#</th><th>Date & Time</th><th>Marked By</th></tr>
+            <tr><th>#</th><th>Date & Time</th><th>Marked By</th><th>Status</th></tr>
           </thead>
           <tbody>
             {% for record in attendance %}
@@ -121,6 +121,15 @@
               <td>{{ loop.index }}</td>
               <td>{{ record.timestamp.strftime('%d %b %Y, %I:%M %p') if record.timestamp else '—' }}</td>
               <td>{{ record.marked_by_name or 'Self' }}</td>
+              <td>
+                {% if record.status == 'rectified' %}
+                <span class="badge bg-warning"><i class="fas fa-edit me-1"></i>Rectified</span>
+                {% elif record.status == 'absent' %}
+                <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Absent</span>
+                {% else %}
+                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Present</span>
+                {% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>

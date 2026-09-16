@@ -361,15 +361,15 @@
                   <small class="text-muted"><i class="fas fa-calendar me-1"></i>Requested: ${r.created_at}</small>
                 </div>
               </div>
-              ${r.status === 'pending' ? `
-                <div class="ms-3">
-                  <button class="btn btn-sm btn-success me-1" onclick="openReviewModal(${JSON.stringify(r).replace(/"/g, '"')}, 'approve')">
-                    <i class="fas fa-check me-1"></i>Approve
-                  </button>
-                  <button class="btn btn-sm btn-danger" onclick="openReviewModal(${JSON.stringify(r).replace(/"/g, '"')}, 'reject')">
-                    <i class="fas fa-times me-1"></i>Reject
-                  </button>
-                </div>
+${r.status === 'pending' ? `
+                  <div class="ms-3">
+                    <button class="btn btn-sm btn-success me-1" onclick='openReviewModal(${JSON.stringify(r).replace(/'/g, "\\'")}, "approve")'>
+                      <i class="fas fa-check me-1"></i>Approve
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick='openReviewModal(${JSON.stringify(r).replace(/'/g, "\\'")}, "reject")'>
+                      <i class="fas fa-times me-1"></i>Reject
+                    </button>
+                  </div>
               ` : r.status === 'approved' ? `
                 <div class="ms-3">
                   <span class="badge bg-success">Approved by admin</span>
