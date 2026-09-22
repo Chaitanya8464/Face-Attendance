@@ -65,11 +65,11 @@
               <div class="card-body text-center py-4">
                 <!-- Avatar -->
                 <div class="position-relative d-inline-block mb-3">
-                  {% if user.avatar %}
-                    <img src="{{ user.avatar }}" alt="Profile" class="rounded-circle border border-3" style="width: 120px; height: 120px; object-fit: cover;">
+                  {% if student.avatar %}
+                    <img src="{{ student.avatar }}" alt="Profile" class="rounded-circle border border-3" style="width: 120px; height: 120px; object-fit: cover;">
                   {% else %}
                     <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center mx-auto" style="width: 120px; height: 120px;">
-                      <i class="fas fa-user fa-4x text-white"></i>
+                      <i class="fas fa-user-graduate fa-4x text-white"></i>
                     </div>
                   {% endif %}
                   
@@ -83,30 +83,26 @@
                   </form>
                 </div>
 
-                <h5 class="mb-1">{{ user.username }}</h5>
-                <span class="badge bg-{% if user.role == 'admin' %}danger{% elif user.role == 'teacher' %}primary{% else %}secondary{% endif %}">
-                  {{ user.role|capitalize }}
-                </span>
-                {% if user.teacher_id %}
-                  <div class="mt-1 small text-muted">Teacher ID: {{ user.teacher_id }}</div>
-                {% endif %}
+                <h5 class="mb-1">{{ student.name }}</h5>
+                <span class="badge bg-secondary">Student</span>
+                <div class="mt-1 small text-muted">
+                  UID: {{ student.uid }}<br>
+                  Roll: {{ student.roll }}
+                </div>
 
                 <hr>
 
                 <div class="text-start small">
-                  <div class="mb-2"><i class="fas fa-envelope me-2 text-muted"></i>{{ user.email }}</div>
-                  {% if user.contact_no %}
-                    <div class="mb-2"><i class="fas fa-phone me-2 text-muted"></i>{{ user.contact_no }}</div>
+                  <div class="mb-2"><i class="fas fa-envelope me-2 text-muted"></i>{{ student.email or 'Not provided' }}</div>
+                  {% if student.contact_no %}
+                    <div class="mb-2"><i class="fas fa-phone me-2 text-muted"></i>{{ student.contact_no }}</div>
                   {% endif %}
-                  {% if user.date_of_join %}
-                    <div class="mb-2"><i class="fas fa-calendar-day me-2 text-muted"></i>Joined: {{ user.date_of_join.strftime('%B %d, %Y') }}</div>
+                  {% if student.date_of_join %}
+                    <div class="mb-2"><i class="fas fa-calendar-day me-2 text-muted"></i>Joined: {{ student.date_of_join.strftime('%B %d, %Y') }}</div>
                   {% endif %}
-                  <div class="mb-2"><i class="fas fa-calendar-plus me-2 text-muted"></i>Account Created: {{ user.created_at.strftime('%B %d, %Y') }}</div>
-                  {% if user.last_login %}
-                    <div class="mb-2"><i class="fas fa-clock me-2 text-muted"></i>Last Login: {{ user.last_login.strftime('%B %d, %Y %H:%M') }}</div>
-                  {% endif %}
-                  <div><i class="fas fa-{% if user.is_verified %}check-circle text-success{% else %}clock text-warning{% endif %} me-2"></i>
-                    {% if user.is_verified %}Verified{% else %}Unverified{% endif %}
+                  <div class="mb-2"><i class="fas fa-calendar-plus me-2 text-muted"></i>Registered: {{ student.added_on.strftime('%B %d, %Y') }}</div>
+                  <div><i class="fas fa-{% if student.credentials_sent %}check-circle text-success{% else %}clock text-warning{% endif %} me-2"></i>
+                    {% if student.credentials_sent %}Credentials Sent{% else %}Credentials Pending{% endif %}
                   </div>
                 </div>
               </div>
@@ -119,21 +115,12 @@
               </div>
               <div class="card-body">
                 <div class="d-grid gap-2">
-                  <a href="{% if user.role == 'admin' %}/dashboard{% elif user.role == 'teacher' %}/dashboard{% else %}/student-dashboard{% endif %}" class="btn btn-outline-primary">
+                  <a href="/student-dashboard" class="btn btn-outline-primary">
                     <i class="fas fa-tachometer-alt me-2"></i>Dashboard
                   </a>
-                  {% if user.role == 'admin' %}
-                    <a href="/admin/users" class="btn btn-outline-secondary">
-                      <i class="fas fa-users-cog me-2"></i>Manage Users
-                    </a>
-                    <a href="/admin/students" class="btn btn-outline-secondary">
-                      <i class="fas fa-user-graduate me-2"></i>Manage Students
-                    </a>
-                  {% elif user.role == 'teacher' %}
-                    <a href="/attendance" class="btn btn-outline-secondary">
-                      <i class="fas fa-qrcode me-2"></i>Mark Attendance
-                    </a>
-                  {% endif %}
+                  <a href="/student/attendance" class="btn btn-outline-secondary">
+                    <i class="fas fa-history me-2"></i>My Attendance
+                  </a>
                 </div>
               </div>
             </div>
@@ -152,41 +139,45 @@
                   
                   <div class="row g-3">
                     <div class="col-md-6">
-                      <label for="username" class="form-label"><i class="fas fa-user me-1"></i>Username *</label>
-                      <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" required>
+                      <label for="name" class="form-label"><i class="fas fa-user me-1"></i>Full Name *</label>
+                      <input type="text" class="form-control" id="name" name="name" value="{{ student.name }}" required>
                     </div>
                     <div class="col-md-6">
-                      <label for="full_name" class="form-label"><i class="fas fa-id-card me-1"></i>Full Name</label>
-                      <input type="text" class="form-control" id="full_name" name="full_name" value="{{ user.full_name or '' }}" placeholder="Display name">
-                    </div>
-                    <div class="col-md-6">
-                      <label for="email" class="form-label"><i class="fas fa-envelope me-1"></i>Email *</label>
-                      <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+                      <label for="email" class="form-label"><i class="fas fa-envelope me-1"></i>Email</label>
+                      <input type="email" class="form-control" id="email" name="email" value="{{ student.email or '' }}" placeholder="student@example.com">
                     </div>
                     <div class="col-md-6">
                       <label for="contact_no" class="form-label"><i class="fas fa-phone me-1"></i>Contact Number</label>
-                      <input type="tel" class="form-control" id="contact_no" name="contact_no" value="{{ user.contact_no or '' }}" placeholder="+91 98765 43210">
+                      <input type="tel" class="form-control" id="contact_no" name="contact_no" value="{{ student.contact_no or '' }}" placeholder="+91 98765 43210">
                     </div>
                     <div class="col-md-6">
                       <label for="date_of_join" class="form-label"><i class="fas fa-calendar-day me-1"></i>Date of Join</label>
-                      <input type="date" class="form-control" id="date_of_join" name="date_of_join" value="{{ user.date_of_join.strftime('%Y-%m-%d') if user.date_of_join else '' }}">
+                      <input type="date" class="form-control" id="date_of_join" name="date_of_join" value="{{ student.date_of_join.strftime('%Y-%m-%d') if student.date_of_join else '' }}">
                     </div>
                     <div class="col-md-6">
                       <label for="age" class="form-label"><i class="fas fa-birthday-cake me-1"></i>Age</label>
-                      <input type="number" class="form-control" id="age" name="age" value="{{ user.age or '' }}" min="1" max="100" placeholder="Enter age">
+                      <input type="number" class="form-control" id="age" name="age" value="{{ student.age or '' }}" min="1" max="100" placeholder="Enter age">
                     </div>
                     <div class="col-md-6">
+                      <label for="class_name" class="form-label"><i class="fas fa-school me-1"></i>Class</label>
+                      <input type="text" class="form-control" id="class_name" name="class_name" value="{{ student.class_name or '' }}" placeholder="e.g., 10th, 12th, MCA">
+                    </div>
+                    <div class="col-md-6">
+                      <label for="batch" class="form-label"><i class="fas fa-calendar-alt me-1"></i>Batch</label>
+                      <input type="text" class="form-control" id="batch" name="batch" value="{{ student.batch or '' }}" placeholder="e.g., 2024-2025, A, B">
+                    </div>
+                    <div class="col-md-12">
                       <label for="address" class="form-label"><i class="fas fa-map-marker-alt me-1"></i>Address</label>
-                      <textarea class="form-control" id="address" name="address" rows="3" placeholder="Enter full address">{{ user.address or '' }}</textarea>
+                      <textarea class="form-control" id="address" name="address" rows="3" placeholder="Enter full address">{{ student.address or '' }}</textarea>
                     </div>
                     <div class="col-md-6">
-                      <label for="role" class="form-label"><i class="fas fa-user-tag me-1"></i>Role</label>
-                      <input type="text" class="form-control" value="{{ user.role|capitalize }}" readonly>
-                      <div class="form-text">Role cannot be changed from here</div>
+                      <label for="roll" class="form-label"><i class="fas fa-hashtag me-1"></i>Roll Number</label>
+                      <input type="text" class="form-control" id="roll" value="{{ student.roll }}" readonly>
+                      <div class="form-text">Roll number cannot be changed</div>
                     </div>
                     <div class="col-md-6">
-                      <label for="teacher_id" class="form-label"><i class="fas fa-id-badge me-1"></i>Teacher ID</label>
-                      <input type="text" class="form-control" value="{{ user.teacher_id or 'N/A' }}" readonly>
+                      <label for="uid" class="form-label"><i class="fas fa-id-card me-1"></i>Student UID</label>
+                      <input type="text" class="form-control" id="uid" value="{{ student.uid }}" readonly>
                     </div>
                   </div>
                   
@@ -196,7 +187,7 @@
                     <button type="submit" class="btn btn-primary">
                       <i class="fas fa-save me-2"></i>Save Changes
                     </button>
-                    <a href="{% if user.role == 'admin' %}/dashboard{% elif user.role == 'teacher' %}/dashboard{% else %}/student-dashboard{% endif %}" class="btn btn-outline-secondary">
+                    <a href="/student-dashboard" class="btn btn-outline-secondary">
                       <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
                     </a>
                   </div>
@@ -220,8 +211,8 @@
                     </div>
                     <div class="col-md-4">
                       <label for="new_password" class="form-label"><i class="fas fa-key me-1"></i>New Password *</label>
-                      <input type="password" class="form-control" id="new_password" name="new_password" required minlength="8">
-                      <div class="form-text">Minimum 8 characters</div>
+                      <input type="password" class="form-control" id="new_password" name="new_password" required minlength="6">
+                      <div class="form-text">Minimum 6 characters</div>
                     </div>
                     <div class="col-md-4">
                       <label for="confirm_password" class="form-label"><i class="fas fa-key me-1"></i>Confirm New Password *</label>
@@ -241,24 +232,23 @@
             <!-- Security Info -->
             <div class="card animated">
               <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Security Information</h5>
+                <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Account Information</h5>
               </div>
               <div class="card-body">
                 <div class="row">
                   <div class="col-md-6">
                     <h6><i class="fas fa-history me-2"></i>Password History</h6>
                     <ul class="list-unstyled small">
-                      <li><i class="fas fa-key me-2"></i>Last Changed: {{ user.password_changed_at.strftime('%B %d, %Y %H:%M') if user.password_changed_at else 'Never' }}</li>
-                      <li><i class="fas fa-user-shield me-2"></i>First Login: {% if user.first_login %}Yes (pending change){% else %}Completed{% endif %}</li>
+                      <li><i class="fas fa-key me-2"></i>Last Changed: {{ student.password_changed_at.strftime('%B %d, %Y %H:%M') if student.password_changed_at else 'Never (using temporary password)' }}</li>
+                      <li><i class="fas fa-user-shield me-2"></i>First Login: {% if student.first_login %}Yes (pending change){% else %}Completed{% endif %}</li>
                     </ul>
                   </div>
                   <div class="col-md-6">
                     <h6><i class="fas fa-user-check me-2"></i>Account Status</h6>
                     <ul class="list-unstyled small">
-                      <li><i class="fas fa-{% if user.is_verified %}check-circle text-success{% else %}clock text-warning{% endif %} me-2"></i>Email: {% if user.is_verified %}Verified{% else %}Pending Verification{% endif %}</li>
-                      <li><i class="fas fa-{% if user.is_active %}check-circle text-success{% else %}times-circle text-danger{% endif %} me-2"></i>Status: {% if user.is_active %}Active{% else %}Deactivated{% endif %}</li>
-                      <li><i class="fas fa-calendar-plus me-2"></i>Created: {{ user.created_at.strftime('%B %d, %Y %H:%M') }}</li>
-                      <li><i class="fas fa-sign-in-alt me-2"></i>Last Login: {{ user.last_login.strftime('%B %d, %Y %H:%M') if user.last_login else 'Never' }}</li>
+                      <li><i class="fas fa-{% if student.is_trained %}check-circle text-success{% else %}clock text-warning{% endif %} me-2"></i>Face Trained: {% if student.is_trained %}Yes{% else %}No{% endif %}</li>
+                      <li><i class="fas fa-{% if student.credentials_sent %}check-circle text-success{% else %}clock text-warning{% endif %} me-2"></i>Credentials: {% if student.credentials_sent %}Sent{% else %}Pending{% endif %}</li>
+                      <li><i class="fas fa-calendar-plus me-2"></i>Registered: {{ student.added_on.strftime('%B %d, %Y %H:%M') }}</li>
                     </ul>
                   </div>
                 </div>

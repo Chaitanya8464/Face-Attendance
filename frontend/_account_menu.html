@@ -31,19 +31,28 @@
 <li class="nav-item dropdown">
     <button class="nav-link dropdown-toggle border-0 bg-transparent text-start" type="button"
             data-bs-toggle="dropdown" aria-expanded="false">
-      <i class="fas fa-user-circle me-1"></i> Profile
+      <i class="fas fa-user-circle me-1"></i> 
+      {% if current_user.is_authenticated %}
+        {{ current_user.full_name or current_user.username }}
+      {% else %}
+        {{ session.get('student_name', 'Student') }}
+      {% endif %}
     </button>
     <ul class="dropdown-menu dropdown-menu-end shadow">
       {% if current_user.is_authenticated %}
-        <li><span class="dropdown-item-text text-muted small">Signed in as {{ current_user.username }}</span></li>
+        <li><span class="dropdown-item-text text-muted small">
+          {% if current_user.full_name %}
+            {{ current_user.full_name }} <small class="text-muted">({{ current_user.username }})</small>
+          {% else %}
+            {{ current_user.username }}
+          {% endif %}
+        </span></li>
         <li><a class="dropdown-item" href="/dashboard"><i class="fas fa-table-columns me-2"></i>Dashboard</a></li>
-        {% if current_user.is_student() %}
-          <li><a class="dropdown-item" href="/student/profile"><i class="fas fa-id-card me-2"></i>My Profile</a></li>
-        {% endif %}
+        <li><a class="dropdown-item" href="/profile"><i class="fas fa-id-card me-2"></i>My Profile</a></li>
         <li><hr class="dropdown-divider"></li>
         <li><a class="dropdown-item text-danger" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
       {% else %}
-        <li><span class="dropdown-item-text text-muted small">Signed in as {{ session.get('student_name', 'Student') }}</span></li>
+        <li><span class="dropdown-item-text text-muted small">{{ session.get('student_name', 'Student') }}</span></li>
         <li><a class="dropdown-item" href="/student-dashboard"><i class="fas fa-table-columns me-2"></i>Dashboard</a></li>
         <li><a class="dropdown-item" href="/student/profile"><i class="fas fa-id-card me-2"></i>My Profile</a></li>
         <li><hr class="dropdown-divider"></li>

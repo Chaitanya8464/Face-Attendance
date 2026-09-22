@@ -14,6 +14,7 @@ Configuration required in app.py:
     - MAIL_PASSWORD
     - MAIL_DEFAULT_SENDER
 """
+import logging
 from flask import render_template, url_for, current_app
 from flask_mail import Mail, Message
 from threading import Thread
@@ -21,15 +22,17 @@ from threading import Thread
 # Initialize Flask-Mail
 mail = Mail()
 
+logger = logging.getLogger(__name__)
+
 
 def send_async_email(app, msg):
     """Send email asynchronously to avoid blocking"""
     with app.app_context():
         try:
             mail.send(msg)
-            print(f"Email sent successfully to {msg.recipients}")
+            logger.info(f"Email sent successfully to {msg.recipients}")
         except Exception as e:
-            print(f"Failed to send email: {e}")
+            logger.exception(f"Failed to send email: {e}")
 
 
 def send_email(subject, recipients, text_body, html_body):
@@ -212,6 +215,58 @@ Face Attendance System Team
     )
 
     return send_email(subject, [student.email], text_body, html_body)
+
+
+def send_teacher_credentials_email(teacher, password):
+    """
+    Send login credentials to newly added teacher.
+
+    Args:
+        teacher: User object (role=teacher)
+        password: Plain text password (temporary)
+    """
+    if not teacher.email:
+        return None
+
+    login_url = url_for('login', _external=True)
+
+    subject = 'Your Teacher Account Credentials - Face Attendance System'
+
+    text_body = f'''
+Hello {teacher.username},
+
+Welcome to Face Attendance System!
+
+Your teacher account has been created by the administrator. Please use the following credentials to log in:
+
+Teacher ID: {teacher.teacher_id}
+Username: {teacher.username}
+Email: {teacher.email}
+Temporary Password: {password}
+
+You can log in at:
+{login_url}
+
+IMPORTANT:
+- Please change your password after first login
+- Please keep your credentials secure
+- Do not share your password with anyone
+- Your Teacher ID ({teacher.teacher_id}) is permanent and used for attendance records
+
+Best regards,
+Face Attendance System Team
+'''
+
+    html_body = render_template(
+        'teacher_credentials_email.html',
+        teacher_name=teacher.username,
+        teacher_id=teacher.teacher_id,
+        teacher_email=teacher.email,
+        password=password,
+        login_url=login_url
+    )
+
+    return send_email(subject, [teacher.email], text_body, html_body)
 
 
 def send_student_password_reset_email(student, token):

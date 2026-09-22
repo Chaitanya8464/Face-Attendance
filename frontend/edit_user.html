@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Edit User - Admin</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="/">
+          <i class="fas fa-user-check"></i>
+          <span>FaceAttendance</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            {% include '_account_menu.html' %}
+
+            <li class="nav-item">
+              <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3" id="flash-messages">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <!-- Main Content -->
+    <main class="py-4">
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-6">
+      <div class="card animated">
+        <div class="card-header bg-warning">
+          <h5 class="mb-0"><i class="fas fa-edit me-2"></i>Edit User: {{ user.username }}</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST">
+            <!-- Username -->
+            <div class="mb-3">
+              <label for="username" class="form-label">
+                <i class="fas fa-user me-1"></i>Username
+              </label>
+              <input type="text" class="form-control" id="username" name="username"
+                     value="{{ user.username }}" required>
+            </div>
+
+            <!-- Email -->
+            <div class="mb-3">
+              <label for="email" class="form-label">
+                <i class="fas fa-envelope me-1"></i>Email Address
+              </label>
+              <input type="email" class="form-control" id="email" name="email"
+                     value="{{ user.email }}" required>
+            </div>
+
+            <!-- Role -->
+            <div class="mb-3">
+              <label for="role" class="form-label">
+                <i class="fas fa-user-tag me-1"></i>Role
+              </label>
+              <select class="form-select" id="role" name="role" required>
+                <option value="teacher" {% if user.role == 'teacher' %}selected{% endif %}>Teacher</option>
+                <option value="student" {% if user.role == 'student' %}selected{% endif %}>Student</option>
+                <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+              </select>
+            </div>
+
+            <!-- Teacher ID (Read-only for teachers) -->
+            {% if user.role == 'teacher' and user.teacher_id %}
+            <div class="mb-3">
+              <label for="teacher_id" class="form-label">
+                <i class="fas fa-id-badge me-1"></i>Teacher ID
+              </label>
+              <input type="text" class="form-control" id="teacher_id" name="teacher_id"
+                     value="{{ user.teacher_id }}" readonly>
+              <small class="text-muted">Teacher ID is auto-generated and cannot be changed</small>
+            </div>
+            {% endif %}
+
+            <!-- New Password (Optional) -->
+            <div class="mb-3">
+              <label for="new_password" class="form-label">
+                <i class="fas fa-key me-1"></i>New Password (Optional)
+              </label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="new_password" name="new_password"
+                       placeholder="Leave blank to keep current password">
+                <button class="btn btn-outline-secondary" type="button" onclick="generatePassword()">
+                  <i class="fas fa-magic"></i> Generate
+                </button>
+              </div>
+              <small class="text-muted">Minimum 8 characters. Leave blank to keep the current password.</small>
+            </div>
+
+            <!-- Current Info -->
+            <div class="alert alert-info">
+              <i class="fas fa-info-circle me-2"></i>
+              <strong>Current Information:</strong><br>
+              <small>
+                ID: {{ user.id }}<br>
+                Joined: {{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'N/A' }}<br>
+                Last Login: {{ user.last_login.strftime('%B %d, %Y %H:%M') if user.last_login else 'Never' }}<br>
+                Verified: {% if user.is_verified %}Yes{% else %}No{% endif %}<br>
+                Status: {% if user.is_active %}Active{% else %}Inactive{% endif %}
+              </small>
+            </div>
+
+            <!-- Buttons -->
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-warning">
+                <i class="fas fa-save me-2"></i>Save Changes
+              </button>
+              <a href="/admin/users" class="btn btn-outline-secondary">
+                <i class="fas fa-times me-2"></i>Cancel
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">
+              <i class="fas fa-user-check me-2"></i>FaceAttendance
+            </h5>
+            <p class="mb-0">Advanced face recognition system for automated attendance tracking. Fast, accurate, and reliable.</p>
+          </div>
+
+          <div class="col-md-4 mb-4 mb-md-0">
+            <h5 class="text-white mb-3">Quick Links</h5>
+            <ul class="list-unstyled">
+              <li><a href="/login"><i class="fas fa-chevron-right me-2"></i>Staff Login</a></li>
+              <li><a href="/student-login"><i class="fas fa-chevron-right me-2"></i>Student Login</a></li>
+              <li><a href="/register"><i class="fas fa-chevron-right me-2"></i>Register Student</a></li>
+              <li><a href="/dashboard"><i class="fas fa-chevron-right me-2"></i>Dashboard</a></li>
+            </ul>
+          </div>
+
+          <div class="col-md-4">
+            <h5 class="text-white mb-3">Connect With Us</h5>
+            <div class="social-links">
+              <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+              <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+              <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+            <p class="mt-3 mb-0 small">© 2025 Face Attendance System. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+    <script>
+    function generatePassword() {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+      let password = '';
+      for (let i = 0; i < 12; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      document.getElementById('new_password').value = password;
+    }
+    </script>
+  </body>
+</html>

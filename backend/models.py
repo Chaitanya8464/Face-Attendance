@@ -59,9 +59,23 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, nullable=True)
     reset_token = db.Column(db.String(100), unique=True, nullable=True)
     reset_token_expiry = db.Column(db.DateTime, nullable=True)
+    first_login = db.Column(db.Boolean, default=False)  # Track first login for password change enforcement
+    
+    # Profile fields
+    contact_no = db.Column(db.String(20), nullable=True)
+    date_of_join = db.Column(db.Date, nullable=True)
+    avatar = db.Column(db.String(200), nullable=True)  # Path to avatar image
+    age = db.Column(db.Integer, nullable=True)
+    address = db.Column(db.Text, nullable=True)
+    full_name = db.Column(db.String(100), nullable=True)  # Display name separate from username
     
     # Relationship to Student model (if user is a student)
-    student_profile = db.relationship('Student', backref='user_account', uselist=False, lazy=True)
+    student_profile = db.relationship('Student', backref='user_account', uselist=False, lazy=True, cascade='all, delete-orphan')
+    
+    # Relationships for attendance marked by this user
+    attendance_marked = db.relationship('Attendance', foreign_keys='Attendance.marked_by', backref='marked_by_user', lazy=True)
+    
+    # Notifications relationship is defined in Notification model with backref='notifications'
     
     def set_password(self, password):
         """Hash and set the user's password"""
@@ -174,6 +188,16 @@ class Student(db.Model):
     temporary_password = db.Column(db.String(50), nullable=True)  # Original generated password retained for administrator exports
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     email = db.Column(db.String(120), unique=True, nullable=True, index=True)  # Student email
+    
+    # Profile fields
+    contact_no = db.Column(db.String(20), nullable=True)
+    date_of_join = db.Column(db.Date, nullable=True)
+    avatar = db.Column(db.String(200), nullable=True)  # Path to avatar image
+    age = db.Column(db.Integer, nullable=True)
+    address = db.Column(db.Text, nullable=True)
+    class_name = db.Column(db.String(50), nullable=True)  # Class (e.g., "10th", "12th", "MCA")
+    batch = db.Column(db.String(50), nullable=True)  # Batch/Year (e.g., "2024-2025", "A", "B")
+    
     # The face_encoding stores the 128-dimensional vector as a BLOB
     face_encoding = db.Column(EncodedFace, nullable=True)
     is_trained = db.Column(db.Boolean, default=False)  # Track if face is trained
@@ -185,7 +209,12 @@ class Student(db.Model):
 
     # Relationship to attendance records
     # lazy=True means records are loaded when accessed (not upfront)
-    attendance_records = db.relationship('Attendance', backref='student', lazy=True)
+    attendance_records = db.relationship('Attendance', backref='student', lazy=True, cascade='all, delete-orphan')
+    
+    # Notifications relationship is defined in Notification model with backref='notifications'
+    
+    # Relationship to rectification requests
+    rectification_requests = db.relationship('RectificationRequest', foreign_keys='RectificationRequest.student_id', backref='student_ref', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
         """Hash and set the student's password"""
@@ -227,6 +256,9 @@ class Attendance(db.Model):
 
     def __repr__(self):
         return f"Attendance('{self.student_id}', '{self.timestamp}', '{self.status}')"
+    
+    # Relationship to rectification requests
+    rectification_requests = db.relationship('RectificationRequest', foreign_keys='RectificationRequest.attendance_id', backref='attendance_ref', lazy=True, cascade='all, delete-orphan')
 
 
 class Notification(db.Model):
@@ -314,11 +346,44 @@ class RectificationRequest(db.Model):
     reviewed_at = db.Column(db.DateTime, nullable=True)
     
     # Relationships
-    attendance = db.relationship('Attendance', backref='rectification_requests', lazy=True)
-    student = db.relationship('Student', backref='rectification_requests', lazy=True)
+    attendance = db.relationship('Attendance', foreign_keys='RectificationRequest.attendance_id', lazy=True)
+    student = db.relationship('Student', foreign_keys='RectificationRequest.student_id', lazy=True)
     teacher = db.relationship('User', foreign_keys=[teacher_id], backref='submitted_rectifications', lazy=True)
     admin = db.relationship('User', foreign_keys=[admin_id], backref='reviewed_rectifications', lazy=True)
     new_marked_by = db.relationship('User', foreign_keys=[requested_marked_by], backref='assigned_rectifications', lazy=True)
     
     def __repr__(self):
         return f"RectificationRequest('{self.id}', '{self.status}')"
+
+
+class AuditLog(db.Model):
+    """
+    Audit Log model - tracks all admin actions for security and compliance.
+    
+    Attributes:
+        id: Primary key
+        user_id: Foreign key to User table (admin who performed action)
+        action: Action performed (create, update, delete, etc.)
+        resource_type: Type of resource affected (user, student, teacher, attendance, etc.)
+        resource_id: ID of the affected resource
+        details: JSON string with details of the action
+        ip_address: IP address of the admin
+        user_agent: User agent string
+        created_at: When action was performed
+    """
+    __tablename__ = 'audit_log'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    action = db.Column(db.String(50), nullable=False, index=True)
+    resource_type = db.Column(db.String(50), nullable=False, index=True)
+    resource_id = db.Column(db.Integer, nullable=True, index=True)
+    details = db.Column(db.Text, nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now, index=True)
+    
+    # Relationship
+    user = db.relationship('User', backref='audit_logs', lazy=True)
+    
+    def __repr__(self):
+        return f"AuditLog('{self.action}', '{self.resource_type}', '{self.resource_id}')"

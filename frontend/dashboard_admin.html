@@ -53,7 +53,10 @@
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
       <h1 class="fw-bold"><i class="fas fa-user-shield me-2"></i>Admin Dashboard</h1>
-      <p class="text-muted">Manage users and system settings</p>
+      <p class="text-muted">
+        Welcome, {{ current_user.full_name or current_user.username }}
+        <small class="text-muted ms-2">({{ current_user.role|capitalize }})</small>
+      </p>
     </div>
     <div>
       <a href="/admin/users" class="btn btn-primary">

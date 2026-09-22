@@ -15,6 +15,7 @@ NOTE: The face_recognition library requires dlib which needs CMake to compile.
       See README.md for installation instructions.
 """
 import os
+import logging
 import face_recognition
 import cv2
 import pickle
@@ -31,6 +32,8 @@ ENCODINGS_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'encod
 # Create dataset directory if it doesn't exist
 if not os.path.exists(DATASET_DIR):
     os.makedirs(DATASET_DIR)
+
+logger = logging.getLogger(__name__)
 
 def save_base64_image(base64_string, roll):
     """
@@ -69,7 +72,7 @@ def save_base64_image(base64_string, roll):
 
         return save_path
     except Exception as e:
-        print(f"Error saving image: {e}")
+        logger.exception(f"Error saving image: {e}")
         return None
 
 def encode_faces():
@@ -114,7 +117,7 @@ def load_encodings():
             data = pickle.loads(f.read())
             return data["encodings"], data["rolls"]
     except FileNotFoundError:
-        print("Encodings file not found. Run /train first.")
+        logger.warning("Encodings file not found. Run /train first.")
         return [], []
 
 def recognize_faces_from_frame(frame):

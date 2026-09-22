@@ -1145,6 +1145,61 @@ body.dark-mode .form-label {
   color: var(--dark-text);
 }
 
+/* Dark mode placeholders */
+body.dark-mode .form-control::placeholder,
+body.dark-mode .form-select::placeholder,
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+  opacity: 1 !important;
+}
+
+/* Light mode placeholders */
+body:not(.dark-mode) .form-control::placeholder,
+body:not(.dark-mode) .form-select::placeholder,
+body:not(.dark-mode) input::placeholder,
+body:not(.dark-mode) textarea::placeholder {
+  color: rgba(26, 26, 26, 0.5) !important;
+  opacity: 1 !important;
+}
+
+/* Dark mode input group text */
+body.dark-mode .input-group-text {
+  background: var(--dark-card);
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+}
+
+/* Dark mode disabled/readonly inputs */
+body.dark-mode .form-control:disabled,
+body.dark-mode .form-control[readonly],
+body.dark-mode .form-select:disabled {
+  background: var(--dark-card);
+  color: rgba(255, 255, 255, 0.6);
+  border-color: var(--dark-border);
+  opacity: 1;
+}
+
+/* Dark mode form text/help text */
+body.dark-mode .form-text,
+body.dark-mode .form-text small,
+body.dark-mode small.text-muted {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Dark mode for select options */
+body.dark-mode select.form-select option {
+  background: var(--dark-card);
+  color: var(--dark-text);
+}
+
+/* Dark mode for textarea */
+body.dark-mode textarea.form-control {
+  background: var(--dark-card);
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+}
+
 /* ========================================
    ALERTS & TOASTS
    ======================================== */

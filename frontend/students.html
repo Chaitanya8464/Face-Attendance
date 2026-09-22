@@ -143,10 +143,13 @@
               </td>
               <td>{{ student.trained_at.strftime('%d %b %Y') if student.trained_at else '—' }}</td>
               <td>{{ student.added_on.strftime('%d %b %Y') if student.added_on else '—' }}</td>
-              <td>
+<td>
                 <div class="btn-group btn-group-sm" role="group">
                   <a href="/capture/{{ student.roll }}" class="btn btn-outline-primary" title="Capture faces">
                     <i class="fas fa-camera"></i>
+                  </a>
+                  <a href="/admin/students/{{ student.id }}/edit" class="btn btn-outline-warning" title="Edit student">
+                    <i class="fas fa-edit"></i>
                   </a>
                   <button type="button" class="btn btn-outline-secondary" title="View credentials"
                           onclick='showCredentials({{ student.id }}, {{ student.name|tojson }}, {{ student.roll|tojson }}, {{ student.uid|tojson }})'>

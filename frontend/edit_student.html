@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Student Login - Face Attendance</title>
+    <title>Edit Student - Admin</title>
 
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -57,63 +57,89 @@
 
     <!-- Main Content -->
     <main class="py-4">
-<div class="container py-5">
+<div class="container py-4">
   <div class="row justify-content-center">
-    <div class="col-md-5">
-      <div class="card shadow-lg animated">
-        <div class="card-body p-5">
-          <div class="text-center mb-4">
-            <i class="fas fa-user-graduate fa-4x mb-3" style="color: var(--primary-color);"></i>
-            <h2 class="fw-bold">Student Login</h2>
-            <p class="text-muted">Access your attendance records</p>
-          </div>
-
-          <form method="POST" action="/student-login">
+    <div class="col-lg-6">
+      <div class="card animated">
+        <div class="card-header bg-warning">
+          <h5 class="mb-0"><i class="fas fa-edit me-2"></i>Edit Student: {{ student.name }}</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST">
+            <!-- Name -->
             <div class="mb-3">
-              <label for="uid" class="form-label">Student UID</label>
-              <div class="input-group">
-                <span class="input-group-text">
-                  <i class="fas fa-id-badge"></i>
-                </span>
-                <input type="text" class="form-control font-monospace" id="uid" name="uid" required autofocus placeholder="Enter your UID">
-              </div>
-              <small class="text-muted">Your unique student ID (provided by admin)</small>
+              <label for="name" class="form-label">
+                <i class="fas fa-user me-1"></i>Full Name
+              </label>
+              <input type="text" class="form-control" id="name" name="name"
+                     value="{{ student.name }}" required>
             </div>
 
+            <!-- Roll Number -->
             <div class="mb-3">
-              <label for="password" class="form-label">Password</label>
+              <label for="roll" class="form-label">
+                <i class="fas fa-hashtag me-1"></i>Roll Number
+              </label>
+              <input type="text" class="form-control" id="roll" name="roll"
+                     value="{{ student.roll }}" required>
+            </div>
+
+            <!-- UID (Read-only) -->
+            <div class="mb-3">
+              <label for="uid" class="form-label">
+                <i class="fas fa-id-card me-1"></i>Student UID
+              </label>
+              <input type="text" class="form-control" id="uid" name="uid"
+                     value="{{ student.uid }}" readonly>
+              <small class="text-muted">UID is auto-generated and cannot be changed</small>
+            </div>
+
+            <!-- Email -->
+            <div class="mb-3">
+              <label for="email" class="form-label">
+                <i class="fas fa-envelope me-1"></i>Email Address (Optional)
+              </label>
+              <input type="email" class="form-control" id="email" name="email"
+                     value="{{ student.email or '' }}" placeholder="student@example.com">
+            </div>
+
+            <!-- New Password (Optional) -->
+            <div class="mb-3">
+              <label for="new_password" class="form-label">
+                <i class="fas fa-key me-1"></i>New Password (Optional)
+              </label>
               <div class="input-group">
-                <span class="input-group-text">
-                  <i class="fas fa-lock"></i>
-                </span>
-                <input type="password" class="form-control" id="password" name="password" required placeholder="Enter your password">
+                <input type="password" class="form-control" id="new_password" name="new_password"
+                       placeholder="Leave blank to keep current password">
+                <button class="btn btn-outline-secondary" type="button" onclick="generatePassword()">
+                  <i class="fas fa-magic"></i> Generate
+                </button>
               </div>
+              <small class="text-muted">Minimum 6 characters. Leave blank to keep the current password. Student will be required to change it on next login.</small>
             </div>
 
-            <div class="mb-3 form-check">
-              <input type="checkbox" class="form-check-input" id="remember" name="remember">
-              <label class="form-check-label" for="remember">Remember me</label>
+            <!-- Current Info -->
+            <div class="alert alert-info">
+              <i class="fas fa-info-circle me-2"></i>
+              <strong>Current Information:</strong><br>
+              <small>
+                ID: {{ student.id }}<br>
+                Registered: {{ student.added_on.strftime('%B %d, %Y') if student.added_on else 'N/A' }}<br>
+                Trained: {% if student.is_trained %}Yes ({{ student.trained_at.strftime('%B %d, %Y') if student.trained_at else 'Unknown' }}){% else %}No{% endif %}<br>
+                Password Changed: {% if student.password_changed_at %}Yes{% else %}No (first login required){% endif %}
+              </small>
             </div>
 
-            <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
-              <i class="fas fa-sign-in-alt me-2"></i> Login to Dashboard
-            </button>
+            <!-- Buttons -->
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-warning">
+                <i class="fas fa-save me-2"></i>Save Changes
+              </button>
+              <a href="/admin/students" class="btn btn-outline-secondary">
+                <i class="fas fa-times me-2"></i>Cancel
+              </a>
+            </div>
           </form>
-
-          <div class="text-center mb-3">
-            <a href="/student/forgot-password" class="text-decoration-none small">
-              <i class="fas fa-question-circle me-1"></i>Forgot Password?
-            </a>
-          </div>
-
-          <hr class="my-4">
-
-          <div class="text-center">
-            <p class="mb-0 small text-muted">
-              <i class="fas fa-info-circle me-1"></i>
-              Use the UID and password provided by your administrator
-            </p>
-          </div>
         </div>
       </div>
     </div>
@@ -161,5 +187,15 @@
 
     <!-- Custom JS -->
     <script src="/static/js/main.js"></script>
+    <script>
+    function generatePassword() {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+      let password = '';
+      for (let i = 0; i < 10; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      document.getElementById('new_password').value = password;
+    }
+    </script>
   </body>
 </html>

@@ -9,6 +9,7 @@ import os
 import base64
 import io
 import csv
+import logging
 import numpy as np
 import cv2
 from datetime import datetime, timedelta
@@ -16,15 +17,22 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, m
 from flask_login import login_user, logout_user, current_user
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
+# --- Logging Configuration ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(name)s %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # --- Flask & Database Setup ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 FRONTEND_ROOT = os.path.join(BASE_DIR, '..', 'frontend')  # frontend is at same level as backend
 
 # Import models and utilities
-from models import db, Student, Attendance, User, Notification, RectificationRequest
+from models import db, Student, Attendance, User, Notification, RectificationRequest, AuditLog
 from face_utils import encode_faces, recognize_faces_from_frame, save_base64_image
 from auth_utils import login_manager, admin_required, teacher_required, verified_required, update_last_login
-from email_utils import mail, send_verification_email, send_password_reset_email, send_welcome_email, send_attendance_notification, send_low_attendance_notification, send_attendance_marked_to_admin, create_notification, send_rectification_request_to_admin, send_rectification_decision_to_teacher, send_rectification_notification_to_student
+from email_utils import mail, send_verification_email, send_password_reset_email, send_welcome_email, send_attendance_notification, send_low_attendance_notification, send_attendance_marked_to_admin, create_notification, send_rectification_request_to_admin, send_rectification_decision_to_teacher, send_rectification_notification_to_student, send_teacher_credentials_email
 
 app = Flask(__name__,
             template_folder=FRONTEND_ROOT,
@@ -56,11 +64,42 @@ db.init_app(app)
 login_manager.init_app(app)
 mail.init_app(app)
 
+# Initialize rate limiter
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
+
 # Make current_user available in all templates
 @app.context_processor
 def inject_user():
     from flask_login import current_user
     return dict(current_user=current_user)
+
+
+def create_audit_log(action, resource_type, resource_id=None, details=None):
+    """Create an audit log entry for admin actions"""
+    try:
+        if current_user.is_authenticated and current_user.is_admin():
+            audit = AuditLog(
+                user_id=current_user.id,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                details=details,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')[:500]
+            )
+            db.session.add(audit)
+            db.session.commit()
+    except Exception as e:
+        logger.error(f"Failed to create audit log: {e}")
+        db.session.rollback()
 
 # --- Ensure tables exist and create admin user ---
 with app.app_context():
@@ -69,16 +108,24 @@ with app.app_context():
     # Create default admin user if not exists
     admin = User.query.filter_by(role='admin').first()
     if not admin:
+        import secrets
+        # Generate a secure random password
+        default_password = secrets.token_urlsafe(16)
         admin = User(
             email='admin@faceattendance.com',
             username='admin',
             role='admin',
-            is_verified=True
+            is_verified=True,
+            first_login=True  # Force password change on first login
         )
-        admin.set_password('admin123')  # Default password - change in production!
+        admin.set_password(default_password)
         db.session.add(admin)
         db.session.commit()
-        print("Default admin user created: admin@faceattendance.com / admin123")
+        logger.warning(f"DEFAULT ADMIN CREATED - CHANGE PASSWORD IMMEDIATELY!")
+        logger.warning(f"Username: admin")
+        logger.warning(f"Email: admin@faceattendance.com")
+        logger.warning(f"Temporary Password: {default_password}")
+        logger.warning(f"Login at /login and change password immediately!")
 
 
 # -----------------------
@@ -106,6 +153,7 @@ def index():
 # ========================================
 
 @app.route('/student-login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def student_login():
     """Student login with UID and password"""
     from flask_login import login_user
@@ -130,8 +178,7 @@ def student_login():
             user = User.query.filter_by(id=student.user_id).first()
 
             if user and user.is_student():
-                # Keep the student session available to the student-specific
-                # dashboard, profile, and first-login password flow.
+                # Student has a linked User account - use Flask-Login
                 session['student_id'] = student.id
                 session['student_name'] = student.name
                 session['student_roll'] = student.roll
@@ -144,10 +191,9 @@ def student_login():
                     flash('Please change your password to continue.', 'warning')
                     return redirect(url_for('student_change_password'))
 
-                return redirect(url_for('dashboard'))
+                return redirect(url_for('student_dashboard'))
             else:
-                # Student doesn't have a user account, create temporary session
-                # For now, just redirect to student dashboard with student info in session
+                # Student doesn't have a user account - create session-based auth
                 session['student_id'] = student.id
                 session['student_name'] = student.name
                 session['student_roll'] = student.roll
@@ -326,6 +372,7 @@ def student_change_password():
 
 
 @app.route('/student/forgot-password', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def student_forgot_password():
     """Student forgot password - request reset"""
     if request.method == 'POST':
@@ -350,7 +397,7 @@ def student_forgot_password():
                 send_student_password_reset_email(student, token)
                 flash('Password reset link sent to your email.', 'success')
             except Exception as e:
-                print(f"Email send failed: {e}")
+                logger.debug(f"Email send failed: {e}")
                 # Fallback: show token for testing
                 flash(f'Email configuration not available. Reset token: {token}', 'info')
         else:
@@ -363,6 +410,7 @@ def student_forgot_password():
 
 
 @app.route('/student/reset-password/<token>', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def student_reset_password(token):
     """Student reset password with token"""
     from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -410,6 +458,7 @@ def student_reset_password(token):
 
 
 @app.route('/student/profile', methods=['GET', 'POST'])
+@limiter.limit("20 per minute")
 def student_profile():
     """Student profile page - view and edit details"""
     if 'student_id' not in session:
@@ -425,30 +474,105 @@ def student_profile():
         return redirect(url_for('student_login'))
 
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip()
+        action = request.form.get('action', '')
+        
+        if action == 'update_profile':
+            name = request.form.get('name', '').strip()
+            email = request.form.get('email', '').strip()
+            contact_no = request.form.get('contact_no', '').strip()
+            date_of_join = request.form.get('date_of_join', '').strip()
+            age = request.form.get('age', '').strip()
+            address = request.form.get('address', '').strip()
+            class_name = request.form.get('class_name', '').strip()
+            batch = request.form.get('batch', '').strip()
 
-        if not name:
-            return render_template('profile.html', student=student, error='Name is required')
+            if not name:
+                flash('Name is required.', 'error')
+                return redirect(url_for('student_profile'))
 
-        # Update student details
-        student.name = name
-        if email:
-            # Check if email is already taken by another student
-            existing = Student.query.filter_by(email=email).first()
-            if existing and existing.id != student.id:
-                return render_template('profile.html', student=student, error='Email already registered')
-        student.email = email or None
+            if email:
+                existing = Student.query.filter_by(email=email).first()
+                if existing and existing.id != student.id:
+                    flash('Email already registered.', 'error')
+                    return redirect(url_for('student_profile'))
 
-        db.session.commit()
+            student.name = name
+            student.email = email or None
+            student.contact_no = contact_no or None
+            if date_of_join:
+                try:
+                    student.date_of_join = datetime.strptime(date_of_join, '%Y-%m-%d').date()
+                except ValueError:
+                    flash('Invalid date format. Use YYYY-MM-DD.', 'error')
+                    return redirect(url_for('student_profile'))
+            if age:
+                try:
+                    student.age = int(age)
+                except ValueError:
+                    flash('Invalid age format.', 'error')
+                    return redirect(url_for('student_profile'))
+            if address:
+                student.address = address
+            if class_name:
+                student.class_name = class_name
+            if batch:
+                student.batch = batch
 
-        # Update session
-        session['student_name'] = name
+            db.session.commit()
+            session['student_name'] = name
+            flash('Profile updated successfully!', 'success')
+            return redirect(url_for('student_profile'))
+        
+        elif action == 'change_password':
+            current_password = request.form.get('current_password', '')
+            new_password = request.form.get('new_password', '')
+            confirm_password = request.form.get('confirm_password', '')
 
-        flash('Profile updated successfully!', 'success')
-        return redirect(url_for('student_profile'))
+            if not student.check_password(current_password):
+                flash('Current password is incorrect.', 'error')
+            elif not new_password:
+                flash('New password is required.', 'error')
+            elif len(new_password) < 6:
+                flash('Password must be at least 6 characters.', 'error')
+            elif new_password != confirm_password:
+                flash('Passwords do not match.', 'error')
+            else:
+                student.set_password(new_password)
+                student.password_changed_at = datetime.utcnow()
+                student.first_login = False
+                db.session.commit()
+                flash('Password changed successfully!', 'success')
+            return redirect(url_for('student_profile'))
+        
+        elif action == 'upload_avatar':
+            if 'avatar' in request.files:
+                file = request.files['avatar']
+                if file and file.filename:
+                    import os
+                    from werkzeug.utils import secure_filename
+                    upload_dir = os.path.join(app.static_folder, 'uploads', 'avatars')
+                    os.makedirs(upload_dir, exist_ok=True)
+                    
+                    if student.avatar:
+                        old_path = os.path.join(app.static_folder, student.avatar.lstrip('/'))
+                        if os.path.exists(old_path):
+                            try:
+                                os.remove(old_path)
+                            except:
+                                pass
+                    
+                    filename = secure_filename(f"avatar_student_{student.id}_{file.filename}")
+                    file_path = os.path.join(upload_dir, filename)
+                    file.save(file_path)
+                    
+                    student.avatar = f'/static/uploads/avatars/{filename}'
+                    db.session.commit()
+                    flash('Avatar uploaded successfully!', 'success')
+                else:
+                    flash('No file selected.', 'error')
+            return redirect(url_for('student_profile'))
 
-    return render_template('profile.html', student=student)
+    return render_template('student_profile.html', student=student)
 
 
 # ========================================
@@ -456,8 +580,9 @@ def student_profile():
 # ========================================
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def login():
-    """User login page"""
+    """User login page - supports both username and email"""
     from flask_login import login_user
     from auth_utils import update_last_login
     
@@ -465,14 +590,17 @@ def login():
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
+        username_or_email = request.form.get('username_or_email', '').strip()
         password = request.form.get('password', '')
         remember = request.form.get('remember', False)
         
-        if not (email and password):
-            return render_template('login.html', error='Email and password required')
+        if not (username_or_email and password):
+            return render_template('login.html', error='Username/Email and password required')
 
-        user = User.query.filter_by(email=email).first()
+        # Try to find user by username first, then by email
+        user = User.query.filter_by(username=username_or_email).first()
+        if not user:
+            user = User.query.filter_by(email=username_or_email).first()
 
         if user and user.check_password(password):
             if not user.is_active:
@@ -481,11 +609,16 @@ def login():
             login_user(user, remember=remember)
             update_last_login(user)
 
+            # Force password change on first login for admin/teacher
+            if user.first_login and (user.is_admin() or user.is_teacher()):
+                flash('Please change your temporary password to continue.', 'warning')
+                return redirect(url_for('change_password_first_login'))
+
             next_page = request.args.get('next')
             flash(f'Welcome back, {user.username}!', 'success')
             return redirect(next_page if next_page else url_for('dashboard'))
         else:
-            return render_template('login.html', error='Invalid email or password')
+            return render_template('login.html', error='Invalid username/email or password')
 
     return render_template('login.html')
 
@@ -499,7 +632,157 @@ def logout():
     return redirect(url_for('login'))
 
 
+@app.route('/change-password-first-login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
+def change_password_first_login():
+    """Force password change on first login for admin/teacher"""
+    from flask_login import login_required
+    if not current_user.is_authenticated:
+        return redirect(url_for('login'))
+    
+    if not current_user.first_login:
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        if not current_user.check_password(current_password):
+            return render_template('change_password_first_login.html', error='Current password is incorrect')
+        
+        if not new_password:
+            return render_template('change_password_first_login.html', error='New password is required')
+        
+        if len(new_password) < 8:
+            return render_template('change_password_first_login.html', error='Password must be at least 8 characters')
+        
+        if new_password != confirm_password:
+            return render_template('change_password_first_login.html', error='Passwords do not match')
+        
+        current_user.set_password(new_password)
+        current_user.first_login = False
+        current_user.password_changed_at = datetime.utcnow()
+        db.session.commit()
+        
+        create_audit_log('update', 'user', current_user.id, 'Changed password on first login')
+        
+        flash('Password changed successfully! Welcome to FaceAttendance.', 'success')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('change_password_first_login.html')
+
+
+@app.route('/profile', methods=['GET', 'POST'])
+@limiter.limit("20 per minute")
+def profile():
+    """User profile page with CRUD operations"""
+    from flask_login import login_required
+    if not current_user.is_authenticated:
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        action = request.form.get('action', '')
+        
+        if action == 'update_profile':
+            username = request.form.get('username', '').strip()
+            full_name = request.form.get('full_name', '').strip()
+            email = request.form.get('email', '').strip()
+            contact_no = request.form.get('contact_no', '').strip()
+            date_of_join = request.form.get('date_of_join', '').strip()
+            age = request.form.get('age', '').strip()
+            address = request.form.get('address', '').strip()
+            
+            if not username:
+                flash('Username is required.', 'error')
+            elif User.query.filter(User.username == username, User.id != current_user.id).first():
+                flash('Username already taken.', 'error')
+            elif not email:
+                flash('Email is required.', 'error')
+            elif User.query.filter(User.email == email, User.id != current_user.id).first():
+                flash('Email already registered.', 'error')
+            else:
+                current_user.username = username
+                if hasattr(current_user, 'full_name'):
+                    current_user.full_name = full_name or None
+                current_user.email = email
+                if hasattr(current_user, 'contact_no'):
+                    current_user.contact_no = contact_no
+                if date_of_join:
+                    try:
+                        current_user.date_of_join = datetime.strptime(date_of_join, '%Y-%m-%d').date()
+                    except ValueError:
+                        flash('Invalid date format. Use YYYY-MM-DD.', 'error')
+                        return render_template('profile.html')
+                if age:
+                    try:
+                        current_user.age = int(age)
+                    except ValueError:
+                        flash('Invalid age format.', 'error')
+                        return render_template('profile.html')
+                if hasattr(current_user, 'address'):
+                    current_user.address = address
+                
+                db.session.commit()
+                create_audit_log('update', 'user', current_user.id, 'Updated profile information')
+                flash('Profile updated successfully!', 'success')
+        
+        elif action == 'change_password':
+            current_password = request.form.get('current_password', '')
+            new_password = request.form.get('new_password', '')
+            confirm_password = request.form.get('confirm_password', '')
+            
+            if not current_user.check_password(current_password):
+                flash('Current password is incorrect.', 'error')
+            elif not new_password:
+                flash('New password is required.', 'error')
+            elif len(new_password) < 8:
+                flash('Password must be at least 8 characters.', 'error')
+            elif new_password != confirm_password:
+                flash('Passwords do not match.', 'error')
+            else:
+                current_user.set_password(new_password)
+                current_user.password_changed_at = datetime.utcnow()
+                db.session.commit()
+                create_audit_log('update', 'user', current_user.id, 'Changed password from profile')
+                flash('Password changed successfully!', 'success')
+        
+        elif action == 'upload_avatar':
+            if 'avatar' in request.files:
+                file = request.files['avatar']
+                if file and file.filename:
+                    import os
+                    from werkzeug.utils import secure_filename
+                    upload_dir = os.path.join(app.static_folder, 'uploads', 'avatars')
+                    os.makedirs(upload_dir, exist_ok=True)
+                    
+                    # Delete old avatar if exists
+                    if current_user.avatar:
+                        old_path = os.path.join(app.static_folder, current_user.avatar.lstrip('/'))
+                        if os.path.exists(old_path):
+                            try:
+                                os.remove(old_path)
+                            except:
+                                pass
+                    
+                    filename = secure_filename(f"avatar_{current_user.id}_{file.filename}")
+                    file_path = os.path.join(upload_dir, filename)
+                    file.save(file_path)
+                    
+                    current_user.avatar = f'/static/uploads/avatars/{filename}'
+                    db.session.commit()
+                    create_audit_log('update', 'user', current_user.id, 'Updated profile avatar')
+                    flash('Avatar uploaded successfully!', 'success')
+                else:
+                    flash('No file selected.', 'error')
+        
+        return redirect(url_for('profile'))
+    
+    return render_template('profile.html', user=current_user)
+
+
 @app.route('/verify-email')
+@limiter.limit("5 per minute")
 def verify_email():
     """Email verification page"""
     if not current_user.is_authenticated:
@@ -520,6 +803,7 @@ def verify_email():
 
 
 @app.route('/verify-email/<token>')
+@limiter.limit("5 per minute")
 def verify_email_token(token):
     """Verify email with token"""
     serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
@@ -549,6 +833,7 @@ def verify_email_token(token):
 
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def forgot_password():
     """Password reset request page"""
     if request.method == 'POST':
@@ -564,7 +849,7 @@ def forgot_password():
                 send_password_reset_email(user)
                 flash('Password reset link sent to your email.', 'success')
             except Exception as e:
-                print(f"Email send failed: {e}")
+                logger.debug(f"Email send failed: {e}")
                 flash('Could not send reset email. Please try again later.', 'error')
         else:
             # Don't reveal if email exists or not (security)
@@ -576,6 +861,7 @@ def forgot_password():
 
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def reset_password(token):
     """Password reset page with token"""
     user = User.verify_reset_token(token)
@@ -684,6 +970,7 @@ def generate_student_uid():
 
 @app.route('/register', methods=['GET', 'POST'])
 @admin_required
+@limiter.limit("10 per minute")
 def register():
     """Admin-only student registration with unique UID and password generation"""
     import secrets
@@ -710,6 +997,8 @@ def register():
         student.temporary_password = password  # Store temporary password for export
         db.session.add(student)
         db.session.commit()
+        
+        create_audit_log('create', 'student', student.id, f'Registered student {name} (Roll: {roll}, UID: {uid})')
 
         # Send credentials email if email provided
         if email:
@@ -719,7 +1008,7 @@ def register():
                 db.session.commit()
                 flash(f'Student registered successfully! Credentials sent to {email}', 'success')
             except Exception as e:
-                print(f"Failed to send credentials email: {e}")
+                logger.debug(f"Failed to send credentials email: {e}")
                 flash('Student registered! Email sending failed. Show credentials below.', 'warning')
         else:
             flash('Student registered successfully!', 'success')
@@ -799,26 +1088,24 @@ def api_upload_face():
 
         # Validate image data format
         if not image_b64.startswith('data:image'):
-            print(f"[WARNING] Invalid image format. Expected data URI, got: {image_b64[:50]}...")
+            logger.warning(f"Invalid image format. Expected data URI, got: {image_b64[:50]}...")
             return jsonify({'error': 'Invalid image format. Expected base64 data URI'}), 400
 
-        print(f"[INFO] Uploading face image for roll: {roll}")
+        logger.info(f"Uploading face image for roll: {roll}")
         
         saved_path = save_base64_image(image_b64, roll)
         
         if not saved_path:
-            print(f"[ERROR] Failed to save image for roll: {roll}")
+            logger.error(f"Failed to save image for roll: {roll}")
             return jsonify({'error': 'Failed to save image. Check server logs.'}), 500
         
         filename = os.path.basename(saved_path)
-        print(f"[INFO] Image saved successfully: {filename}")
+        logger.info(f"Image saved successfully: {filename}")
 
         return jsonify({'saved': filename}), 200
 
     except Exception as e:
-        print(f"[ERROR] Upload failed: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"Upload failed: {e}")
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
 
@@ -844,7 +1131,7 @@ def train():
 
         return render_template('train.html', total=total, trained_count=len(rolls_trained))
     except Exception as e:
-        print(f"[ERROR] Training failed: {e}")
+        logger.error(f"Training failed: {e}")
         # TODO: Show more detailed error message to user
         return render_template('train.html', total=0, error="Training failed. Check dataset and face_utils.py.")
 
@@ -921,12 +1208,12 @@ def api_start_recognize():
                                 from email_utils import send_attendance_notification
                                 send_attendance_notification(student, marked_by_name or 'Self', datetime.now())
                         except Exception as e:
-                            print(f"Failed to send student notification: {e}")
+                            logger.debug(f"Failed to send student notification: {e}")
 
         return jsonify({'marked': marked}), 200
 
     except Exception as e:
-        print(f"[ERROR] Recognition failed: {e}")
+        logger.error(f"Recognition failed: {e}")
         return jsonify({'error': 'Recognition failed'}), 500
 
 
@@ -971,7 +1258,7 @@ def check_and_send_low_attendance_alert(student, threshold=75):
             try:
                 send_low_attendance_notification(student, round(attendance_percentage, 1), threshold)
             except Exception as e:
-                print(f"Failed to send low attendance email: {e}")
+                logger.debug(f"Failed to send low attendance email: {e}")
             
             # Create in-app notification for admins
             try:
@@ -985,7 +1272,7 @@ def check_and_send_low_attendance_alert(student, threshold=75):
                         message=f'{student.name} ({student.roll}) attendance is {attendance_percentage:.1f}% (below {threshold}% threshold)'
                     )
             except Exception as e:
-                print(f"Failed to create low attendance notification: {e}")
+                logger.debug(f"Failed to create low attendance notification: {e}")
             
             return True
     return False
@@ -1065,7 +1352,7 @@ def api_recognize_attendance():
                         try:
                             send_attendance_notification(student, marked_by_name or 'Self', marked_at)
                         except Exception as e:
-                            print(f"Failed to send student notification: {e}")
+                            logger.debug(f"Failed to send student notification: {e}")
                         try:
                             admins = User.query.filter_by(role='admin').all()
                             for admin in admins:
@@ -1079,13 +1366,13 @@ def api_recognize_attendance():
                                 # Also send email to admin
                                 send_attendance_marked_to_admin(admin, student, marked_by_name or 'Self', marked_at)
                         except Exception as e:
-                            print(f"Failed to create admin notification: {e}")
+                            logger.debug(f"Failed to create admin notification: {e}")
                         
                         # 3. Check for low attendance and send alert
                         try:
                             check_and_send_low_attendance_alert(student)
                         except Exception as e:
-                            print(f"Failed to check low attendance: {e}")
+                            logger.debug(f"Failed to check low attendance: {e}")
 
                     recognized.append({
                         'roll': student.roll,
@@ -1105,7 +1392,7 @@ def api_recognize_attendance():
         }), 200
 
     except Exception as e:
-        print(f"[ERROR] Attendance recognition failed: {e}")
+        logger.error(f"Attendance recognition failed: {e}")
         return jsonify({'error': 'Recognition failed'}), 500
 
 
@@ -1244,124 +1531,6 @@ def api_check_low_attendance():
     })
 
 
-@admin_required
-def api_rectify_attendance():
-    """
-    Rectify/Correct an attendance record (Admin direct rectification).
-    Can change: marked_by, marked_by_name, timestamp, or delete the record.
-    
-    Expected JSON:
-    {
-        "attendance_id": 123,
-        "action": "update" | "delete",
-        "marked_by": 456,  # optional - user ID of teacher
-        "marked_by_name": "New Teacher Name",  # optional
-        "timestamp": "2026-09-01 10:30:00",  # optional - ISO format
-        "reason": "Reason for rectification"  # required
-    }
-    """
-    try:
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-        
-        attendance_id = data.get('attendance_id')
-        action = data.get('action', 'update')
-        reason = data.get('reason', '').strip()
-        
-        if not attendance_id:
-            return jsonify({'error': 'Attendance ID required'}), 400
-        
-        if not reason:
-            return jsonify({'error': 'Reason for rectification required'}), 400
-        
-        attendance = Attendance.query.get_or_404(attendance_id)
-        
-        if action == 'delete':
-            # Store info for notification before deletion
-            student = attendance.student
-            marked_by_name = attendance.marked_by_name
-            timestamp = attendance.timestamp
-            
-            # Create rectification log notification
-            admins = User.query.filter_by(role='admin').all()
-            for admin in admins:
-                create_notification(
-                    user_id=admin.id,
-                    student_id=student.id,
-                    notif_type='attendance_rectified',
-                    title=f'Attendance Deleted: {student.name}',
-                    message=f'Attendance for {student.name} ({student.roll}) on {timestamp.strftime("%Y-%m-%d %H:%M:%S")} was deleted by {current_user.username}. Reason: {reason}'
-                )
-            
-            db.session.delete(attendance)
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'Attendance record deleted'})
-        
-        elif action == 'update':
-            old_marked_by = attendance.marked_by
-            old_marked_by_name = attendance.marked_by_name
-            old_timestamp = attendance.timestamp
-            
-            # Update fields if provided
-            if 'marked_by' in data and data['marked_by']:
-                new_user = User.query.get(data['marked_by'])
-                if not new_user:
-                    return jsonify({'error': 'Invalid teacher/user ID'}), 400
-                attendance.marked_by = new_user.id
-                attendance.marked_by_name = new_user.username
-            
-            if 'marked_by_name' in data and data['marked_by_name']:
-                attendance.marked_by_name = data['marked_by_name']
-            
-            if 'timestamp' in data and data['timestamp']:
-                try:
-                    attendance.timestamp = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
-                except ValueError:
-                    return jsonify({'error': 'Invalid timestamp format. Use ISO format (YYYY-MM-DDTHH:MM:SS)'}), 400
-            
-            db.session.commit()
-            
-            # Create rectification log notification
-            student = attendance.student
-            changes = []
-            if old_marked_by != attendance.marked_by:
-                changes.append(f"marked_by: {old_marked_by_name} -> {attendance.marked_by_name}")
-            if old_timestamp != attendance.timestamp:
-                changes.append(f"time: {old_timestamp.strftime('%Y-%m-%d %H:%M:%S')} -> {attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
-            
-            admins = User.query.filter_by(role='admin').all()
-            for admin in admins:
-                create_notification(
-                    user_id=admin.id,
-                    student_id=student.id,
-                    notif_type='attendance_rectified',
-                    title=f'Attendance Rectified: {student.name}',
-                    message=f'Attendance for {student.name} ({student.roll}) rectified by {current_user.username}. Changes: {"; ".join(changes)}. Reason: {reason}'
-                )
-            
-            return jsonify({
-                'success': True,
-                'message': 'Attendance record updated',
-                'attendance': {
-                    'id': attendance.id,
-                    'student_name': student.name,
-                    'student_roll': student.roll,
-                    'marked_by_name': attendance.marked_by_name,
-                    'timestamp': attendance.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-                }
-            })
-        
-        else:
-            return jsonify({'error': 'Invalid action. Use "update" or "delete"'}), 400
-            
-    except Exception as e:
-        print(f"[ERROR] Attendance rectification failed: {e}")
-        return jsonify({'error': 'Rectification failed'}), 500
-
-
 # -----------------------
 # API: Attendance History (Admin/Teacher)
 # -----------------------
@@ -1431,7 +1600,7 @@ def api_attendance_history():
             }
         })
     except Exception as e:
-        print(f"[ERROR] Get attendance history failed: {e}")
+        logger.error(f"Get attendance history failed: {e}")
         return jsonify({'error': 'Failed to fetch attendance history'}), 500
 
 
@@ -1509,10 +1678,12 @@ Face Attendance System
 '''
                     send_email(subject, [student.email], text_body, text_body)
             except Exception as e:
-                print(f"Failed to notify student: {e}")
+                logger.debug(f"Failed to notify student: {e}")
             
             db.session.delete(attendance)
             db.session.commit()
+            
+            create_audit_log('delete', 'attendance', attendance_id, f'Deleted attendance for {student.name} (Roll: {student.roll}) on {timestamp.strftime("%Y-%m-%d %H:%M:%S")}. Reason: {reason}')
             
             return jsonify({'success': True, 'message': 'Attendance record deleted'})
         
@@ -1539,6 +1710,8 @@ Face Attendance System
                     return jsonify({'error': 'Invalid timestamp format. Use ISO format (YYYY-MM-DDTHH:MM:SS)'}), 400
             
             db.session.commit()
+            
+            create_audit_log('update', 'attendance', attendance_id, f'Updated attendance for {student.name} (Roll: {student.roll}). Changes: {"; ".join(changes)}. Reason: {reason}')
             
             # Create rectification log notification
             student = attendance.student
@@ -1580,7 +1753,7 @@ Face Attendance System
 '''
                     send_email(subject, [student.email], text_body, text_body)
             except Exception as e:
-                print(f"Failed to notify student: {e}")
+                logger.debug(f"Failed to notify student: {e}")
             
             return jsonify({
                 'success': True,
@@ -1598,7 +1771,7 @@ Face Attendance System
             return jsonify({'error': 'Invalid action. Use "update" or "delete"'}), 400
             
     except Exception as e:
-        print(f"[ERROR] Attendance rectification failed: {e}")
+        logger.error(f"Attendance rectification failed: {e}")
         return jsonify({'error': 'Rectification failed'}), 500
 
 
@@ -1631,7 +1804,7 @@ def api_get_today_attendance_by_student(student_id):
             }
         })
     except Exception as e:
-        print(f"[ERROR] Get today attendance failed: {e}")
+        logger.error(f"Get today attendance failed: {e}")
         return jsonify({'error': 'Failed to fetch attendance'}), 500
 
 
@@ -1725,7 +1898,7 @@ def api_submit_rectification_request():
                 # Send email
                 send_rectification_request_to_admin(admin, rect_request, teacher, student, attendance)
         except Exception as e:
-            print(f"Failed to notify admins: {e}")
+            logger.debug(f"Failed to notify admins: {e}")
         
         return jsonify({
             'success': True,
@@ -1734,7 +1907,7 @@ def api_submit_rectification_request():
         })
         
     except Exception as e:
-        print(f"[ERROR] Submit rectification request failed: {e}")
+        logger.error(f"Submit rectification request failed: {e}")
         return jsonify({'error': 'Failed to submit request'}), 500
 
 
@@ -1785,7 +1958,7 @@ def api_get_pending_rectifications():
             }
         })
     except Exception as e:
-        print(f"[ERROR] Get pending rectifications failed: {e}")
+        logger.error(f"Get pending rectifications failed: {e}")
         return jsonify({'error': 'Failed to fetch requests'}), 500
 
 
@@ -1851,13 +2024,13 @@ def api_review_rectification_request():
             try:
                 send_rectification_decision_to_teacher(teacher, rect_request, student, current_user, True)
             except Exception as e:
-                print(f"Failed to notify teacher: {e}")
+                logger.debug(f"Failed to notify teacher: {e}")
             
             # Notify student (with error handling)
             try:
                 send_rectification_notification_to_student(student, rect_request, current_user, True)
             except Exception as e:
-                print(f"Failed to notify student: {e}")
+                logger.debug(f"Failed to notify student: {e}")
             
             # Notify admins (with error handling)
             try:
@@ -1871,7 +2044,7 @@ def api_review_rectification_request():
                         message=f'Request from {teacher.username} approved by {current_user.username}. Attendance record for {attendance_info} marked as rectified (absent). Reason: {rect_request.reason}'
                     )
             except Exception as e:
-                print(f"Failed to notify admins: {e}")
+                logger.debug(f"Failed to notify admins: {e}")
             
             return jsonify({
                 'success': True,
@@ -1923,7 +2096,7 @@ Face Attendance System
 '''
                     send_email(subject, [student.email], text_body, text_body)
             except Exception as e:
-                print(f"Failed to notify student: {e}")
+                logger.debug(f"Failed to notify student: {e}")
             
             return jsonify({
                 'success': True,
@@ -1931,7 +2104,7 @@ Face Attendance System
             })
             
     except Exception as e:
-        print(f"[ERROR] Review rectification request failed: {e}")
+        logger.error(f"Review rectification request failed: {e}")
         return jsonify({'error': 'Failed to review request'}), 500
 
 
@@ -1961,7 +2134,7 @@ def api_get_my_rectification_requests():
             } for r in requests]
         })
     except Exception as e:
-        print(f"[ERROR] Get my rectification requests failed: {e}")
+        logger.error(f"Get my rectification requests failed: {e}")
         return jsonify({'error': 'Failed to fetch requests'}), 500
 
 
@@ -2115,7 +2288,7 @@ def delete_student(student_id):
         return jsonify({'success': True, 'message': 'Student deleted successfully'})
     except Exception as e:
         db.session.rollback()
-        # TODO: Log error properly instead of printing
+        logger.exception(f"Error deleting student {student_id}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -2363,7 +2536,15 @@ def admin_add_teacher():
         db.session.add(teacher)
         db.session.commit()
         
-        flash(f'Teacher added successfully! Teacher ID: {teacher_id}', 'success')
+        create_audit_log('create', 'teacher', teacher.id, f'Created teacher {username} with teacher_id {teacher_id}')
+        
+        # Send credentials email to teacher
+        try:
+            send_teacher_credentials_email(teacher, password)
+            flash(f'Teacher added successfully! Credentials sent to {email}', 'success')
+        except Exception as e:
+            logger.debug(f"Failed to send teacher credentials email: {e}")
+            flash('Teacher added! Email sending failed. Credentials shown below.', 'warning')
         
         # Store credentials in session to show in modal
         session['new_teacher_credentials'] = {
@@ -2501,6 +2682,9 @@ def admin_edit_teacher(teacher_id):
             flash('Teacher details updated.', 'success')
         
         db.session.commit()
+        
+        create_audit_log('update', 'teacher', teacher.id, f'Updated teacher {username}')
+        
         return redirect(url_for('admin_teachers'))
 
     return render_template('edit_teacher.html', teacher=teacher)
@@ -2516,15 +2700,31 @@ def admin_delete_teacher(teacher_id):
         flash('User is not a teacher.', 'error')
         return redirect(url_for('admin_teachers'))
     
-    # Don't allow deleting if they have marked attendance
+    # Check for dependencies that would prevent deletion
     attendance_count = Attendance.query.filter_by(marked_by=teacher.id).count()
-    if attendance_count > 0:
-        flash(f'Cannot delete teacher. They have marked {attendance_count} attendance records.', 'error')
+    rectification_count = RectificationRequest.query.filter_by(teacher_id=teacher.id).count()
+    notification_count = Notification.query.filter_by(user_id=teacher.id).count()
+    
+    if attendance_count > 0 or rectification_count > 0 or notification_count > 0:
+        details = []
+        if attendance_count > 0:
+            details.append(f'{attendance_count} attendance record(s)')
+        if rectification_count > 0:
+            details.append(f'{rectification_count} rectification request(s)')
+        if notification_count > 0:
+            details.append(f'{notification_count} notification(s)')
+        
+        flash(f'Cannot delete teacher. They have: {", ".join(details)}.', 'error')
         return redirect(url_for('admin_teachers'))
     
+    username = teacher.username
+    teacher_id_val = teacher.teacher_id
     db.session.delete(teacher)
     db.session.commit()
-    flash(f'Teacher {teacher.username} has been deleted.', 'success')
+    
+    create_audit_log('delete', 'teacher', teacher_id, f'Deleted teacher {username} (ID: {teacher_id_val})')
+    
+    flash(f'Teacher {username} has been deleted.', 'success')
     return redirect(url_for('admin_teachers'))
 
 
@@ -2551,16 +2751,18 @@ def admin_delete_student(student_id):
                     try:
                         os.remove(file_path)
                     except Exception as e:
-                        print(f"Error deleting file {file}: {e}")
+                        logger.debug(f"Error deleting file {file}: {e}")
 
         # Delete student record
         db.session.delete(student)
         db.session.commit()
+        
+        create_audit_log('delete', 'student', student_id, f'Deleted student {student_name} (Roll: {student_roll})')
 
         flash(f'Student {student_name} ({student_roll}) has been deleted.', 'success')
     except Exception as e:
         db.session.rollback()
-        print(f"Error deleting student: {e}")
+        logger.exception(f"Error deleting student {student_id}: {e}")
         flash(f'Error deleting student: {str(e)}', 'error')
     
     return redirect(url_for('admin_students'))
@@ -2572,6 +2774,69 @@ def admin_delete_student_get(student_id):
     """Redirect GET requests to student management"""
     flash('Invalid request method. Please use the delete button from the student list.', 'warning')
     return redirect(url_for('admin_students'))
+
+
+@app.route('/admin/students/<int:student_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_student(student_id):
+    """Admin panel - Edit student details"""
+    student = Student.query.get_or_404(student_id)
+
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        roll = request.form.get('roll', '').strip()
+        email = request.form.get('email', '').strip()
+        new_password = request.form.get('new_password', '')
+
+        if not name:
+            flash('Name is required.', 'error')
+            return render_template('edit_student.html', student=student)
+
+        if not roll:
+            flash('Roll number is required.', 'error')
+            return render_template('edit_student.html', student=student)
+
+        # Check if roll is taken by another student
+        existing = Student.query.filter_by(roll=roll).first()
+        if existing and existing.id != student.id:
+            flash('Roll number already exists.', 'error')
+            return render_template('edit_student.html', student=student)
+
+        # Check if email is taken by another student
+        if email:
+            existing = Student.query.filter_by(email=email).first()
+            if existing and existing.id != student.id:
+                flash('Email already registered.', 'error')
+                return render_template('edit_student.html', student=student)
+
+        student.name = name
+        old_roll = student.roll
+        student.roll = roll
+        student.email = email if email else None
+
+        if new_password:
+            if len(new_password) < 6:
+                flash('Password must be at least 6 characters.', 'error')
+                return render_template('edit_student.html', student=student)
+            student.set_password(new_password)
+            student.password_changed_at = datetime.utcnow()
+            student.first_login = True
+            flash('Student updated with new password.', 'success')
+        else:
+            flash('Student updated.', 'success')
+
+        db.session.commit()
+        
+        changes = []
+        if old_roll != roll:
+            changes.append(f'roll: {old_roll} -> {roll}')
+        if new_password:
+            changes.append('password changed')
+        create_audit_log('update', 'student', student.id, f'Updated student {name}: {"; ".join(changes)}')
+        
+        return redirect(url_for('admin_students'))
+
+    return render_template('edit_student.html', student=student)
 
 
 # ========================================
@@ -2642,8 +2907,149 @@ def admin_export_credentials():
 @admin_required
 def admin_users():
     """Admin panel - Manage users"""
-    users = User.query.order_by(User.created_at.desc()).all()
-    return render_template('users.html', users=users)
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    search = request.args.get('search', '').strip()
+    role_filter = request.args.get('role', '')
+
+    query = User.query.order_by(User.created_at.desc())
+
+    if search:
+        query = query.filter(
+            db.or_(
+                User.username.ilike(f'%{search}%'),
+                User.email.ilike(f'%{search}%'),
+                User.teacher_id.ilike(f'%{search}%')
+            )
+        )
+
+    if role_filter:
+        query = query.filter_by(role=role_filter)
+
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    return render_template('users.html', users=pagination.items, pagination=pagination, search=search, role_filter=role_filter)
+
+
+@app.route('/admin/users/add', methods=['GET', 'POST'])
+@admin_required
+def admin_add_user():
+    """Admin panel - Add new user"""
+    import secrets
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        role = request.form.get('role', 'teacher')
+
+        if not username:
+            return render_template('add_user.html', error='Username is required')
+
+        if not email:
+            return render_template('add_user.html', error='Email is required')
+
+        if role not in ['admin', 'teacher', 'student']:
+            return render_template('add_user.html', error='Invalid role')
+
+        if User.query.filter_by(username=username).first():
+            return render_template('add_user.html', error='Username already taken')
+
+        if User.query.filter_by(email=email).first():
+            return render_template('add_user.html', error='Email already registered')
+
+        if not password:
+            password = secrets.token_urlsafe(10)
+
+        if len(password) < 8:
+            return render_template('add_user.html', error='Password must be at least 8 characters')
+
+        user = User(
+            username=username,
+            email=email,
+            role=role,
+            is_verified=True,
+            is_active=True
+        )
+        if role == 'teacher':
+            user.teacher_id = generate_teacher_id()
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        
+        create_audit_log('create', 'user', user.id, f'Created user {username} with role {role}')
+
+        flash(f'User {username} created successfully as {role}!', 'success')
+        return redirect(url_for('admin_users'))
+
+    return render_template('add_user.html')
+
+
+@app.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_user(user_id):
+    """Admin panel - Edit user"""
+    user = User.query.get_or_404(user_id)
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        new_password = request.form.get('new_password', '')
+        role = request.form.get('role', user.role)
+
+        if not username:
+            flash('Username is required.', 'error')
+            return render_template('edit_user.html', user=user)
+
+        if not email:
+            flash('Email is required.', 'error')
+            return render_template('edit_user.html', user=user)
+
+        if role not in ['admin', 'teacher', 'student']:
+            flash('Invalid role.', 'error')
+            return render_template('edit_user.html', user=user)
+
+        existing = User.query.filter_by(username=username).first()
+        if existing and existing.id != user.id:
+            flash('Username already taken.', 'error')
+            return render_template('edit_user.html', user=user)
+
+        existing = User.query.filter_by(email=email).first()
+        if existing and existing.id != user.id:
+            flash('Email already registered.', 'error')
+            return render_template('edit_user.html', user=user)
+
+        user.username = username
+        user.email = email
+        old_role = user.role
+        user.role = role
+
+        if role == 'teacher' and not user.teacher_id:
+            user.teacher_id = generate_teacher_id()
+        elif role != 'teacher':
+            user.teacher_id = None
+
+        if new_password:
+            if len(new_password) < 8:
+                flash('Password must be at least 8 characters.', 'error')
+                return render_template('edit_user.html', user=user)
+            user.set_password(new_password)
+            flash('User updated with new password.', 'success')
+        else:
+            flash('User updated.', 'success')
+
+        db.session.commit()
+        
+        changes = []
+        if old_role != role:
+            changes.append(f'role: {old_role} -> {role}')
+        if new_password:
+            changes.append('password changed')
+        create_audit_log('update', 'user', user.id, f'Updated user {username}: {"; ".join(changes)}')
+        
+        return redirect(url_for('admin_users'))
+
+    return render_template('edit_user.html', user=user)
 
 
 @app.route('/admin/users/<int:user_id>/activate', methods=['POST'])
@@ -2651,8 +3057,11 @@ def admin_users():
 def admin_activate_user(user_id):
     """Activate or deactivate user account"""
     user = User.query.get_or_404(user_id)
+    old_status = user.is_active
     user.is_active = not user.is_active
     db.session.commit()
+    
+    create_audit_log('update', 'user', user.id, f'Changed status: {old_status} -> {user.is_active}')
     
     status = 'activated' if user.is_active else 'deactivated'
     flash(f'User {user.username} has been {status}.', 'success')
@@ -2669,9 +3078,13 @@ def admin_delete_user(user_id):
         flash('Cannot delete admin user.', 'error')
         return redirect(url_for('admin_users'))
     
+    username = user.username
     db.session.delete(user)
     db.session.commit()
-    flash(f'User {user.username} has been deleted.', 'success')
+    
+    create_audit_log('delete', 'user', user_id, f'Deleted user {username}')
+    
+    flash(f'User {username} has been deleted.', 'success')
     return redirect(url_for('admin_users'))
 
 
@@ -2686,8 +3099,12 @@ def admin_change_role(user_id):
         flash('Invalid role.', 'error')
         return redirect(url_for('admin_users'))
     
+    old_role = user.role
     user.role = new_role
     db.session.commit()
+    
+    create_audit_log('update', 'user', user.id, f'Changed role: {old_role} -> {new_role}')
+    
     flash(f'User {user.username} role changed to {new_role}.', 'success')
     return redirect(url_for('admin_users'))
 
